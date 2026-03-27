@@ -17,6 +17,7 @@ var version = "dev"
 func NewRootCmd() *cobra.Command {
 	var domainOverride string
 	var jsonOutput bool
+	var verbose bool
 
 	root := &cobra.Command{
 		Use:     "pintomind",
@@ -38,11 +39,14 @@ func NewRootCmd() *cobra.Command {
 				return err
 			}
 
+			client := api.New(domain.BaseURL, domain.APIKey)
+			client.Verbose = verbose
 			app := &appctx.App{
 				Config:       cfg,
-				Client:       api.New(domain.BaseURL, domain.APIKey),
+				Client:       client,
 				ActiveDomain: domainName,
 				JSONOutput:   jsonOutput,
+				Verbose:      verbose,
 			}
 			cmd.SetContext(appctx.WithApp(cmd.Context(), app))
 			return nil
@@ -51,7 +55,9 @@ func NewRootCmd() *cobra.Command {
 
 	root.PersistentFlags().StringVar(&domainOverride, "domain", "", "Override active domain")
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")
+	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show HTTP request and response details")
 
+	root.AddCommand(commands.NewAPICmd())
 	root.AddCommand(commands.NewSetupCmd())
 	root.AddCommand(commands.NewConfigCmd())
 	root.AddCommand(commands.NewMeCmd())

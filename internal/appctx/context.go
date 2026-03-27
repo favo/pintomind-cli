@@ -10,10 +10,11 @@ import (
 type key struct{}
 
 type App struct {
-	Config        *config.Config
-	Client        *api.Client
-	ActiveDomain  string
-	JSONOutput    bool
+	Config       *config.Config
+	Client       *api.Client
+	ActiveDomain string
+	JSONOutput   bool
+	Verbose      bool
 }
 
 func WithApp(ctx context.Context, app *App) context.Context {

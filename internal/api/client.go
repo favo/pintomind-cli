@@ -15,6 +15,7 @@ type Client struct {
 	BaseURL    string
 	APIKey     string
 	HTTPClient *http.Client
+	Verbose    bool
 }
 
 func New(baseURL, apiKey string) *Client {
@@ -35,13 +36,15 @@ func New(baseURL, apiKey string) *Client {
 func (c *Client) do(method, path string, body any, out any) error {
 	u := c.BaseURL + "/api/v1" + path
 
+	var bodyBytes []byte
 	var bodyReader io.Reader
 	if body != nil {
-		b, err := json.Marshal(body)
+		var err error
+		bodyBytes, err = json.Marshal(body)
 		if err != nil {
 			return err
 		}
-		bodyReader = bytes.NewReader(b)
+		bodyReader = bytes.NewReader(bodyBytes)
 	}
 
 	req, err := http.NewRequest(method, u, bodyReader)
@@ -54,11 +57,22 @@ func (c *Client) do(method, path string, body any, out any) error {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	if c.Verbose {
+		fmt.Fprintf(debugWriter, "> %s %s\n", method, u)
+		if bodyBytes != nil {
+			fmt.Fprintf(debugWriter, "> body: %s\n", bodyBytes)
+		}
+	}
+
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if c.Verbose {
+		fmt.Fprintf(debugWriter, "< %s\n", resp.Status)
+	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -82,6 +96,44 @@ func (c *Client) do(method, path string, body any, out any) error {
 		}
 	}
 	return nil
+}
+
+// DoRaw performs a raw request and returns the response body bytes.
+// Used by the `api` passthrough command.
+func (c *Client) DoRaw(method, path string, body []byte) ([]byte, int, error) {
+	u := c.BaseURL + "/api/v1" + path
+
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, u, bodyReader)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	if c.Verbose {
+		fmt.Fprintf(debugWriter, "> %s %s\n", method, u)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+
+	if c.Verbose {
+		fmt.Fprintf(debugWriter, "< %s\n", resp.Status)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	return data, resp.StatusCode, err
 }
 
 func (c *Client) Get(path string, query url.Values, out any) error {
