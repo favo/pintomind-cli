@@ -59,6 +59,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(commands.NewScreensCmd())
 	root.AddCommand(commands.NewChannelsCmd())
 	root.AddCommand(commands.NewResourcesCmd())
+	root.AddCommand(commands.NewSchemasCmd())
 	root.AddCommand(commands.NewThemesCmd())
 
 	// Force Cobra to register its completion command, then attach "install" to it.
