@@ -10,16 +10,18 @@ You are an expert at using the `pintomind` CLI to interact with the Pintomind / 
 Config is stored in `~/.config/pintomind/config.json`. Multiple domains are supported.
 
 ```bash
-pintomind config add infoskjermen.no --api-key sk-xxx
+pintomind config add app.infoskjermen.no --api-key sk-xxx
 pintomind config add develop --api-key sk-dev --url https://develop.infoskjermen.no
 pintomind config use develop
 pintomind config list
+pintomind config show   # show active domain and masked API key
 ```
 
 ## Global Flags
 
 - `--domain <name>` — override active domain for a single command
 - `--json` — output raw JSON
+- `--verbose` / `-v` — print HTTP request URL and response status to stderr
 
 ## Screens
 
@@ -27,7 +29,11 @@ pintomind config list
 pintomind screens list
 pintomind screens list --online
 pintomind screens list --offline
+pintomind screens list --page 2 --per-page 50
 pintomind screens show <id>
+pintomind screens stats                  # online/offline counts
+pintomind screens watch                  # live-refresh every 5s (--interval N)
+pintomind screens wait-online <id>       # block until online (--timeout N)
 ```
 
 ### Targeting
@@ -89,6 +95,7 @@ pintomind screens temp-channel <screen-id> <channel-id> --toggle
 ```bash
 pintomind channels list
 pintomind channels list --sort-by name
+pintomind channels list --page 2 --per-page 50
 pintomind channels show <id>
 pintomind channels posts <id>           # account token required
 pintomind channels stats                # requires channels:read:stats scope
@@ -102,6 +109,8 @@ pintomind channels set-theme --all <theme-id>
 ```bash
 pintomind resources list
 pintomind resources list --type text_slide
+pintomind resources list --type text_slide,calendar_events   # comma-separated
+pintomind resources list --page 2 --per-page 50
 pintomind resources show <id>
 pintomind resources stats
 pintomind resources refresh <id>
@@ -113,10 +122,20 @@ pintomind resources delete <id>
 pintomind resources delete <id> --force
 ```
 
+## Schemas
+
+Inspect valid fields for resource types:
+
+```bash
+pintomind schemas list
+pintomind schemas show <id>   # e.g. pintomind schemas show text_slide
+```
+
 ## Themes
 
 ```bash
 pintomind themes list
+pintomind themes list --page 2
 pintomind themes show <id>
 pintomind themes stats
 ```
@@ -128,10 +147,23 @@ pintomind me
 pintomind network
 ```
 
+## Raw API access
+
+For endpoints not yet covered by a dedicated command:
+
+```bash
+pintomind api /screens
+pintomind api /screens/42
+pintomind api GET /channels?sort_by=name
+echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
+```
+
 ## Tips
 
 - Find screen IDs: `pintomind screens list --json | jq '.items[] | {id, name}'`
 - Reload all screens at once: `pintomind screens reload --all`
+- Wait for a screen after reboot: `pintomind screens reboot 42 && pintomind screens wait-online 42`
 - Apply a theme to every channel: `pintomind channels set-theme --all <theme-id>`
+- Inspect valid resource fields: `pintomind schemas show text_slide`
 - Use `--domain develop` to target the dev environment without changing your default.
 - Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens) are required for channel posts.

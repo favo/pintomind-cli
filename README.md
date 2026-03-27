@@ -7,13 +7,13 @@ Command-line interface for the [Pintomind / Infoskjermen](https://infoskjermen.n
 ### One-line install (Linux and macOS)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/favo/pintomind-cli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/favo-no/pintomind-cli/main/install.sh | sh
 ```
 
 Downloads the pre-built binary for your OS and architecture to `~/.local/bin/pintomind`. Override the install directory with `INSTALL_DIR`:
 
 ```bash
-INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/favo/pintomind-cli/main/install.sh | sh
+INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/favo-no/pintomind-cli/main/install.sh | sh
 ```
 
 ### Build from source
@@ -21,7 +21,7 @@ INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/favo/pin
 Requires [Go](https://go.dev/) 1.22+ (or `mise install go`):
 
 ```bash
-git clone https://github.com/favo/pintomind-cli
+git clone https://github.com/favo-no/pintomind-cli
 cd pintomind-cli
 make install
 ```
@@ -29,7 +29,25 @@ make install
 ### Verify
 
 ```bash
-pintomind --version
+pintomind version
+pintomind version --check   # check for a newer release on GitHub
+```
+
+---
+
+## First-time setup
+
+Run all setup steps in one command:
+
+```bash
+pintomind setup all
+```
+
+Or run them individually:
+
+```bash
+pintomind setup claude       # install the Claude Code skill
+pintomind setup completion   # install shell tab-completion
 ```
 
 ---
@@ -48,6 +66,12 @@ The first domain added becomes the default. The base URL defaults to `https://<d
 
 ```bash
 pintomind config add develop --api-key sk-dev-key --url https://develop.infoskjermen.no
+```
+
+### Show active domain
+
+```bash
+pintomind config show
 ```
 
 ### List configured domains
@@ -86,6 +110,7 @@ pintomind --domain develop screens list
 |------|-------------|
 | `--domain <name>` | Override active domain for this command |
 | `--json` | Output raw JSON (useful for scripting and piping to `jq`) |
+| `--verbose` / `-v` | Print HTTP request URL and response status to stderr |
 
 ---
 
@@ -104,7 +129,13 @@ pintomind network      # Show network identity and stats (requires network token
 pintomind screens list
 pintomind screens list --online          # Only online screens
 pintomind screens list --offline         # Only offline screens
+pintomind screens list --page 2 --per-page 50
 pintomind screens show <id>
+pintomind screens stats                  # Online/offline counts
+pintomind screens watch                  # Refresh screen list every N seconds
+pintomind screens watch --interval 10
+pintomind screens wait-online <id>       # Block until screen comes online
+pintomind screens wait-online <id> --timeout 120
 ```
 
 **Targeting flags** — all screen action commands accept:
@@ -169,6 +200,7 @@ pintomind screens temp-channel <screen-id> <channel-id> --toggle
 ```bash
 pintomind channels list
 pintomind channels list --sort-by name
+pintomind channels list --page 2 --per-page 50
 pintomind channels show <id>
 pintomind channels posts <id>            # Requires account token
 pintomind channels stats                 # Requires channels:read:stats scope
@@ -182,6 +214,8 @@ pintomind channels set-theme --all <theme-id>   # Apply to all channels
 ```bash
 pintomind resources list
 pintomind resources list --type text_slide
+pintomind resources list --type text_slide,calendar_events   # comma-separated types
+pintomind resources list --page 2 --per-page 50
 pintomind resources show <id>
 pintomind resources stats
 pintomind resources refresh <id>         # For external resources only
@@ -212,13 +246,36 @@ pintomind resources delete <id>
 pintomind resources delete <id> --force  # Skip confirmation prompt
 ```
 
+### Schemas
+
+Inspect the API schema for resource types (useful for knowing which fields are valid in `--data`):
+
+```bash
+pintomind schemas list
+pintomind schemas show <id>
+```
+
 ### Themes
 
 ```bash
 pintomind themes list
+pintomind themes list --page 2
 pintomind themes show <id>
 pintomind themes stats
 ```
+
+### Raw API access
+
+Send any API request directly — useful for endpoints not yet covered by a dedicated command:
+
+```bash
+pintomind api /screens
+pintomind api /screens/42
+pintomind api GET /channels?sort_by=name
+echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
+```
+
+`METHOD` defaults to `GET`. For `POST`, `PATCH`, and `PUT`, the JSON body is read from stdin.
 
 ---
 
@@ -227,10 +284,10 @@ pintomind themes stats
 Install completions for your user without needing root:
 
 ```bash
-pintomind completion install        # auto-detects your shell
-pintomind completion install bash
-pintomind completion install zsh
-pintomind completion install fish
+pintomind setup completion        # auto-detects your shell
+pintomind setup completion bash
+pintomind setup completion zsh
+pintomind setup completion fish
 ```
 
 **Bash** — writes to `~/.local/share/bash-completion/completions/pintomind`, auto-loaded by bash-completion 2.x. If it doesn't activate immediately, add to `~/.bashrc`:
@@ -265,6 +322,12 @@ Reload all online screens:
 pintomind screens reload --all
 ```
 
+Wait for a screen to come back online after a reboot:
+
+```bash
+pintomind screens reboot 42 && pintomind screens wait-online 42
+```
+
 Find all channels and pick one by name:
 
 ```bash
@@ -275,6 +338,12 @@ Set a theme on every channel:
 
 ```bash
 pintomind channels set-theme --all 5
+```
+
+Inspect valid fields for `text_slide` resources:
+
+```bash
+pintomind schemas show text_slide
 ```
 
 ---
