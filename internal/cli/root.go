@@ -58,7 +58,7 @@ func NewRootCmd() *cobra.Command {
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show HTTP request and response details")
 
 	root.AddCommand(commands.NewAPICmd())
-	root.AddCommand(commands.NewSetupCmd())
+	root.AddCommand(commands.NewSetupCmd(root))
 	root.AddCommand(commands.NewConfigCmd())
 	root.AddCommand(commands.NewMeCmd())
 	root.AddCommand(commands.NewNetworkCmd())
