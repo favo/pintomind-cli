@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -30,6 +31,8 @@ func NewScreensCmd() *cobra.Command {
 	cmd.AddCommand(newScreensListCmd())
 	cmd.AddCommand(newScreensShowCmd())
 	cmd.AddCommand(newScreensStatsCmd())
+	cmd.AddCommand(newScreensWatchCmd())
+	cmd.AddCommand(newScreensWaitOnlineCmd())
 
 	// Channel assignment
 	cmd.AddCommand(newScreensSetChannelCmd())
@@ -306,4 +309,88 @@ func newScreensTempChannelCmd() *cobra.Command {
 	cmd.Flags().StringVar(&until, "until", "", "ISO8601 timestamp until which override is active")
 	cmd.Flags().BoolVar(&toggle, "toggle", false, "Toggle temporary channel active state")
 	return cmd
+}
+
+func newScreensWatchCmd() *cobra.Command {
+	var interval int
+
+	cmd := &cobra.Command{
+		Use:   "watch",
+		Short: "Poll and display screen status, refreshing every N seconds",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			tick := time.NewTicker(time.Duration(interval) * time.Second)
+			defer tick.Stop()
+
+			printScreens := func() error {
+				var resp ScreensResponse
+				if err := a.Client.Get("/screens", url.Values{"per_page": {"1000"}}, &resp); err != nil {
+					return err
+				}
+				// Clear screen
+				fmt.Print("\033[H\033[2J")
+				fmt.Printf("Screens — %s  (refreshing every %ds, Ctrl+C to quit)\n\n",
+					time.Now().Format("15:04:05"), interval)
+				rows := make([][]string, len(resp.Items))
+				for i, s := range resp.Items {
+					status := "offline"
+					if s.Online {
+						status = "online"
+					}
+					ch := "-"
+					if s.ChannelID != nil {
+						ch = fmt.Sprint(s.ChannelID)
+					}
+					rows[i] = []string{strconv.Itoa(s.ID), s.Name, status, ch}
+				}
+				printTable(cmd, []string{"ID", "NAME", "STATUS", "CHANNEL"}, rows)
+				return nil
+			}
+
+			if err := printScreens(); err != nil {
+				return err
+			}
+			for range tick.C {
+				if err := printScreens(); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&interval, "interval", 5, "Refresh interval in seconds")
+	return cmd
+}
+
+func newScreensWaitOnlineCmd() *cobra.Command {
+	var timeout int
+
+	return &cobra.Command{
+		Use:   "wait-online <id>",
+		Short: "Block until a screen comes online (useful in scripts)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			deadline := time.Now().Add(time.Duration(timeout) * time.Second)
+			fmt.Printf("Waiting for screen %s to come online...\n", args[0])
+
+			for {
+				var resp map[string]any
+				if err := a.Client.Get("/screens/"+args[0], nil, &resp); err != nil {
+					return err
+				}
+				if screen, ok := resp["screen"].(map[string]any); ok {
+					if online, _ := screen["online"].(bool); online {
+						fmt.Printf("Screen %s is online.\n", args[0])
+						return nil
+					}
+				}
+				if timeout > 0 && time.Now().After(deadline) {
+					return fmt.Errorf("timed out waiting for screen %s to come online", args[0])
+				}
+				time.Sleep(3 * time.Second)
+				fmt.Print(".")
+			}
+		},
+	}
 }
