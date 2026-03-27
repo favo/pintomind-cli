@@ -52,7 +52,7 @@ func installBash(root *cobra.Command) error {
 	dest := filepath.Join(dir, "pintomind")
 
 	var buf bytes.Buffer
-	if err := root.GenBashCompletion(&buf); err != nil {
+	if err := root.GenBashCompletionV2(&buf, true); err != nil {
 		return err
 	}
 	if err := os.WriteFile(dest, buf.Bytes(), 0644); err != nil {
@@ -74,7 +74,7 @@ func installZsh(root *cobra.Command) error {
 	dest := filepath.Join(dir, "_pintomind")
 
 	var buf bytes.Buffer
-	if err := root.GenZshCompletion(&buf); err != nil {
+	if err := root.GenZshCompletionNoDesc(&buf); err != nil {
 		return err
 	}
 	if err := os.WriteFile(dest, buf.Bytes(), 0644); err != nil {
