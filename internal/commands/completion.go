@@ -9,35 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewCompletionInstallCmd returns an "install" subcommand to be added to
-// Cobra's auto-generated "completion" command.
-func NewCompletionInstallCmd(root *cobra.Command) *cobra.Command {
-	return &cobra.Command{
-		Use:   "install [bash|zsh|fish]",
-		Short: "Install shell completion for the current user (no root required)",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			shell := detectShell()
-			if len(args) == 1 {
-				shell = args[0]
-			}
-			if shell == "" {
-				return fmt.Errorf("could not detect shell — pass it explicitly: pintomind completion install [bash|zsh|fish]")
-			}
-
-			switch shell {
-			case "bash":
-				return installBash(root)
-			case "zsh":
-				return installZsh(root)
-			case "fish":
-				return installFish(root)
-			default:
-				return fmt.Errorf("unsupported shell %q — supported: bash, zsh, fish", shell)
-			}
-		},
-	}
-}
 
 func detectShell() string {
 	shell := os.Getenv("SHELL")

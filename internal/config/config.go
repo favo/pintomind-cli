@@ -13,8 +13,8 @@ type Domain struct {
 }
 
 type Config struct {
-	DefaultDomain string            `json:"default_domain"`
-	Domains       map[string]Domain `json:"domains"`
+	DefaultDomain string            `json:"default_account"`
+	Domains       map[string]Domain `json:"accounts"`
 }
 
 func configPath() (string, error) {

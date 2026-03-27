@@ -69,14 +69,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(commands.NewSchemasCmd())
 	root.AddCommand(commands.NewThemesCmd())
 
-	// Force Cobra to register its completion command, then attach "install" to it.
 	root.InitDefaultCompletionCmd()
-	for _, cmd := range root.Commands() {
-		if cmd.Name() == "completion" {
-			cmd.AddCommand(commands.NewCompletionInstallCmd(root))
-			break
-		}
-	}
 
 	return root
 }
