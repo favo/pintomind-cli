@@ -99,40 +99,44 @@ pintomind screens list --offline         # Only offline screens
 pintomind screens show <id>
 ```
 
-**Send a command to a screen:**
+**Targeting flags** — all screen action commands accept:
+
+| Flag | Description |
+|------|-------------|
+| `<id>` | Single screen by ID |
+| `--ids 1,2,3` | Comma-separated screen IDs (bulk) |
+| `--all` | All screens (fetches IDs automatically, uses bulk endpoint) |
+
+**Commands:**
 
 ```bash
-pintomind screens command <id> reload
-pintomind screens command <id> reboot
-pintomind screens command <id> clear_cache
-pintomind screens command <id> upgrade_firmware
-pintomind screens command <id> identify
-pintomind screens command <id> toggle_night_mode
-```
-
-**Bulk commands** (use `--ids`):
-
-```bash
-pintomind screens command --ids 1,2,3 reload
+pintomind screens reload            [id|--ids ...|--all]
+pintomind screens reboot            [id|--ids ...|--all]
+pintomind screens clear-cache       [id|--ids ...|--all]
+pintomind screens upgrade-firmware  [id|--ids ...|--all]
+pintomind screens identify          [id|--ids ...|--all]
+pintomind screens toggle-night-mode [id|--ids ...|--all]
 ```
 
 **Remote control signals:**
 
 ```bash
-pintomind screens signal <id> next
-pintomind screens signal <id> previous
-pintomind screens signal <id> play
-pintomind screens signal <id> pause
-pintomind screens signal <id> toggle_play
+pintomind screens next          [id|--ids ...|--all]
+pintomind screens previous      [id|--ids ...|--all]
+pintomind screens play          [id|--ids ...|--all]
+pintomind screens pause         [id|--ids ...|--all]
+pintomind screens toggle-play   [id|--ids ...|--all]
+pintomind screens forwards      [id|--ids ...|--all]
+pintomind screens backwards     [id|--ids ...|--all]
 ```
 
-**Effects** (pass `--effect`):
+**Effects:**
 
 ```bash
-pintomind screens signal <id> confetti_fire --effect
-pintomind screens signal <id> confetti_fireworks --effect
-pintomind screens signal <id> confetti_school_parade --effect
-pintomind screens signal <id> snow --effect
+pintomind screens confetti-fire      [id|--ids ...|--all]
+pintomind screens confetti-fireworks [id|--ids ...|--all]
+pintomind screens school-parade      [id|--ids ...|--all]
+pintomind screens snow               [id|--ids ...|--all]
 ```
 
 **Switch channel:**
@@ -140,6 +144,7 @@ pintomind screens signal <id> snow --effect
 ```bash
 pintomind screens set-channel <screen-id> <channel-id>
 pintomind screens set-channel --ids 1,2,3 <channel-id>
+pintomind screens set-channel --all <channel-id>
 ```
 
 **Temporary channel override:**
@@ -147,6 +152,7 @@ pintomind screens set-channel --ids 1,2,3 <channel-id>
 ```bash
 pintomind screens temp-channel <screen-id> <channel-id> --duration 3600
 pintomind screens temp-channel <screen-id> <channel-id> --until 2025-12-31T23:59:00Z
+pintomind screens temp-channel --all <channel-id> --duration 1800
 pintomind screens temp-channel <screen-id> <channel-id> --toggle
 ```
 
@@ -160,6 +166,7 @@ pintomind channels posts <id>            # Requires account token
 pintomind channels stats                 # Requires channels:read:stats scope
 pintomind channels stats <id>
 pintomind channels set-theme <channel-id> <theme-id>
+pintomind channels set-theme --all <theme-id>   # Apply to all channels
 ```
 
 ### Resources
@@ -221,7 +228,7 @@ Follow the instructions printed by each command to enable completion in your she
 
 ## Scripting examples
 
-Get all screen IDs as a list:
+Get all screen IDs:
 
 ```bash
 pintomind screens list --json | jq '[.items[].id]'
@@ -230,15 +237,19 @@ pintomind screens list --json | jq '[.items[].id]'
 Reload all online screens:
 
 ```bash
-pintomind screens list --online --json \
-  | jq '[.items[].id] | join(",")' -r \
-  | xargs -I{} pintomind screens command --ids {} reload
+pintomind screens reload --all
 ```
 
 Find all channels and pick one by name:
 
 ```bash
 pintomind channels list --json | jq '.items[] | select(.name | test("lobby"; "i"))'
+```
+
+Set a theme on every channel:
+
+```bash
+pintomind channels set-theme --all 5
 ```
 
 ---

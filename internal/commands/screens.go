@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -21,21 +20,89 @@ type ScreensResponse struct {
 	Items []Screen `json:"items"`
 }
 
-type ScreenResponse struct {
-	Screen map[string]any `json:"screen"`
-}
-
 func NewScreensCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "screens",
 		Short: "Manage screens",
 	}
+
+	// Read
 	cmd.AddCommand(newScreensListCmd())
 	cmd.AddCommand(newScreensShowCmd())
-	cmd.AddCommand(newScreensCommandCmd())
-	cmd.AddCommand(newScreensSignalCmd())
+
+	// Channel assignment
 	cmd.AddCommand(newScreensSetChannelCmd())
 	cmd.AddCommand(newScreensTempChannelCmd())
+
+	// Direct commands
+	cmd.AddCommand(newScreenActionCmd("reload", "Reload the screen", "reload", ""))
+	cmd.AddCommand(newScreenActionCmd("reboot", "Reboot the screen", "reboot", ""))
+	cmd.AddCommand(newScreenActionCmd("clear-cache", "Clear the screen cache", "clear_cache", ""))
+	cmd.AddCommand(newScreenActionCmd("upgrade-firmware", "Upgrade screen firmware", "upgrade_firmware", ""))
+	cmd.AddCommand(newScreenActionCmd("identify", "Identify the screen (shows overlay)", "identify", ""))
+	cmd.AddCommand(newScreenActionCmd("toggle-night-mode", "Toggle night mode on the screen", "toggle_night_mode", ""))
+
+	// Remote control signals
+	cmd.AddCommand(newScreenActionCmd("next", "Skip to next content", "remote_control", "next"))
+	cmd.AddCommand(newScreenActionCmd("previous", "Go to previous content", "remote_control", "previous"))
+	cmd.AddCommand(newScreenActionCmd("play", "Play content", "remote_control", "play"))
+	cmd.AddCommand(newScreenActionCmd("pause", "Pause content", "remote_control", "pause"))
+	cmd.AddCommand(newScreenActionCmd("toggle-play", "Toggle play/pause", "remote_control", "toggle_play"))
+	cmd.AddCommand(newScreenActionCmd("forwards", "Skip forwards", "remote_control", "forwards"))
+	cmd.AddCommand(newScreenActionCmd("backwards", "Skip backwards", "remote_control", "backwards"))
+
+	// Effects
+	cmd.AddCommand(newScreenActionCmd("confetti-fire", "Trigger confetti fire effect", "trigger_effect", "confetti_fire"))
+	cmd.AddCommand(newScreenActionCmd("confetti-fireworks", "Trigger confetti fireworks effect", "trigger_effect", "confetti_fireworks"))
+	cmd.AddCommand(newScreenActionCmd("school-parade", "Trigger school parade effect", "trigger_effect", "confetti_school_parade"))
+	cmd.AddCommand(newScreenActionCmd("snow", "Trigger snow effect", "trigger_effect", "snow"))
+
+	return cmd
+}
+
+// newScreenActionCmd builds a subcommand that sends a fixed API command+signal to one or more screens.
+func newScreenActionCmd(name, short, apiCommand, signal string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   name + " [id]",
+		Short: short,
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ids, _ := cmd.Flags().GetString("ids")
+			all, _ := cmd.Flags().GetBool("all")
+
+			singleID := ""
+			if len(args) == 1 {
+				singleID = args[0]
+			}
+
+			targetIDs, bulk, err := resolveScreenIDs(cmd, singleID, ids, all)
+			if err != nil {
+				return err
+			}
+
+			screen := map[string]any{"command": apiCommand}
+			if signal != "" {
+				screen["signal"] = signal
+			}
+			body := map[string]any{"screen": screen}
+
+			label := name
+			if signal != "" {
+				label = signal
+			}
+
+			target := targetIDs
+			if bulk {
+				target = "screens " + targetIDs
+			} else {
+				target = "screen " + targetIDs
+			}
+
+			return sendScreenPatch(cmd, targetIDs, bulk, body,
+				fmt.Sprintf("Sent %q to %s", label, target))
+		},
+	}
+	addTargetFlags(cmd)
 	return cmd
 }
 
@@ -104,175 +171,28 @@ func newScreensShowCmd() *cobra.Command {
 	}
 }
 
-var validCommands = []string{
-	"reload", "reboot", "clear_cache", "upgrade_firmware",
-	"identify", "trigger_effect", "remote_control", "toggle_night_mode",
-}
-
-func newScreensCommandCmd() *cobra.Command {
-	var ids string
-
-	cmd := &cobra.Command{
-		Use:   "command <id|--ids id1,id2> <command>",
-		Short: "Send a command to a screen or multiple screens",
-		Long: fmt.Sprintf("Valid commands: %s", strings.Join(validCommands, ", ")),
-		Example: `  pintomind screens command 42 reload
-  pintomind screens command 42 identify
-  pintomind screens command --ids 1,2,3 reboot`,
-		Args: func(cmd *cobra.Command, args []string) error {
-			if ids != "" {
-				if len(args) != 1 {
-					return fmt.Errorf("expected <command> when using --ids")
-				}
-				return nil
-			}
-			if len(args) != 2 {
-				return fmt.Errorf("expected <id> <command>")
-			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			a := app(cmd)
-			var screenID, command string
-			if ids != "" {
-				command = args[0]
-			} else {
-				screenID = args[0]
-				command = args[1]
-			}
-
-			body := map[string]any{"screen": map[string]any{"command": command}}
-
-			if ids != "" {
-				q := url.Values{"ids": {ids}}
-				var resp map[string]any
-				if err := a.Client.Patch("/screens/bulk?"+q.Encode(), body, &resp); err != nil {
-					return err
-				}
-				if a.JSONOutput {
-					printJSON(resp)
-				} else {
-					fmt.Printf("Sent command %q to screens %s\n", command, ids)
-				}
-			} else {
-				var resp map[string]any
-				if err := a.Client.Patch("/screens/"+screenID, body, &resp); err != nil {
-					return err
-				}
-				if a.JSONOutput {
-					printJSON(resp)
-				} else {
-					fmt.Printf("Sent command %q to screen %s\n", command, screenID)
-				}
-			}
-			return nil
-		},
-	}
-	cmd.Flags().StringVar(&ids, "ids", "", "Comma-separated screen IDs for bulk operation")
-	return cmd
-}
-
-var validSignals = []string{"next", "previous", "play", "pause", "toggle_play", "forwards", "backwards"}
-var validEffects = []string{"confetti_fire", "confetti_fireworks", "confetti_school_parade", "snow"}
-
-func newScreensSignalCmd() *cobra.Command {
-	var isEffect bool
-	var ids string
-
-	cmd := &cobra.Command{
-		Use:   "signal <id> <signal>",
-		Short: "Send a remote_control signal or trigger an effect on a screen",
-		Long: fmt.Sprintf("Remote control signals: %s\nEffects (use --effect): %s",
-			strings.Join(validSignals, ", "),
-			strings.Join(validEffects, ", ")),
-		Example: `  pintomind screens signal 42 next
-  pintomind screens signal 42 confetti_fire --effect`,
-		Args: func(cmd *cobra.Command, args []string) error {
-			if ids != "" {
-				if len(args) != 1 {
-					return fmt.Errorf("expected <signal> when using --ids")
-				}
-				return nil
-			}
-			if len(args) != 2 {
-				return fmt.Errorf("expected <id> <signal>")
-			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			a := app(cmd)
-			var screenID, signal string
-			if ids != "" {
-				signal = args[0]
-			} else {
-				screenID = args[0]
-				signal = args[1]
-			}
-
-			command := "remote_control"
-			if isEffect {
-				command = "trigger_effect"
-			}
-
-			body := map[string]any{
-				"screen": map[string]any{
-					"command": command,
-					"signal":  signal,
-				},
-			}
-
-			if ids != "" {
-				q := url.Values{"ids": {ids}}
-				var resp map[string]any
-				if err := a.Client.Patch("/screens/bulk?"+q.Encode(), body, &resp); err != nil {
-					return err
-				}
-				if a.JSONOutput {
-					printJSON(resp)
-				} else {
-					fmt.Printf("Sent signal %q to screens %s\n", signal, ids)
-				}
-			} else {
-				var resp map[string]any
-				if err := a.Client.Patch("/screens/"+screenID, body, &resp); err != nil {
-					return err
-				}
-				if a.JSONOutput {
-					printJSON(resp)
-				} else {
-					fmt.Printf("Sent signal %q to screen %s\n", signal, screenID)
-				}
-			}
-			return nil
-		},
-	}
-	cmd.Flags().BoolVar(&isEffect, "effect", false, "Treat signal as a trigger_effect signal")
-	cmd.Flags().StringVar(&ids, "ids", "", "Comma-separated screen IDs for bulk operation")
-	return cmd
-}
-
 func newScreensSetChannelCmd() *cobra.Command {
-	var ids string
-
 	cmd := &cobra.Command{
-		Use:   "set-channel <screen-id> <channel-id>",
+		Use:   "set-channel [screen-id] <channel-id>",
 		Short: "Switch a screen (or multiple) to a channel",
 		Example: `  pintomind screens set-channel 42 7
-  pintomind screens set-channel --ids 1,2,3 7`,
+  pintomind screens set-channel --ids 1,2,3 7
+  pintomind screens set-channel --all 7`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			a := app(cmd)
+			ids, _ := cmd.Flags().GetString("ids")
+			all, _ := cmd.Flags().GetBool("all")
 
-			var screenID, channelID string
-			if ids != "" {
+			var singleScreenID, channelID string
+			if ids != "" || all {
 				if len(args) != 1 {
-					return fmt.Errorf("expected <channel-id> when using --ids")
+					return fmt.Errorf("expected <channel-id> when using --ids or --all")
 				}
 				channelID = args[0]
 			} else {
 				if len(args) != 2 {
 					return fmt.Errorf("expected <screen-id> <channel-id>")
 				}
-				screenID = args[0]
+				singleScreenID = args[0]
 				channelID = args[1]
 			}
 
@@ -281,34 +201,17 @@ func newScreensSetChannelCmd() *cobra.Command {
 				return fmt.Errorf("channel-id must be an integer")
 			}
 
-			body := map[string]any{"screen": map[string]any{"channel_id": chID}}
-
-			if ids != "" {
-				q := url.Values{"ids": {ids}}
-				var resp map[string]any
-				if err := a.Client.Patch("/screens/bulk?"+q.Encode(), body, &resp); err != nil {
-					return err
-				}
-				if a.JSONOutput {
-					printJSON(resp)
-				} else {
-					fmt.Printf("Switched screens %s to channel %s\n", ids, channelID)
-				}
-			} else {
-				var resp map[string]any
-				if err := a.Client.Patch("/screens/"+screenID, body, &resp); err != nil {
-					return err
-				}
-				if a.JSONOutput {
-					printJSON(resp)
-				} else {
-					fmt.Printf("Switched screen %s to channel %s\n", screenID, channelID)
-				}
+			targetIDs, bulk, err := resolveScreenIDs(cmd, singleScreenID, ids, all)
+			if err != nil {
+				return err
 			}
-			return nil
+
+			body := map[string]any{"screen": map[string]any{"channel_id": chID}}
+			return sendScreenPatch(cmd, targetIDs, bulk, body,
+				fmt.Sprintf("Switched to channel %s", channelID))
 		},
 	}
-	cmd.Flags().StringVar(&ids, "ids", "", "Comma-separated screen IDs for bulk operation")
+	addTargetFlags(cmd)
 	return cmd
 }
 
@@ -316,28 +219,29 @@ func newScreensTempChannelCmd() *cobra.Command {
 	var duration int
 	var until string
 	var toggle bool
-	var ids string
 
 	cmd := &cobra.Command{
-		Use:   "temp-channel <screen-id> <channel-id>",
+		Use:   "temp-channel [screen-id] <channel-id>",
 		Short: "Set a temporary channel override on a screen",
 		Example: `  pintomind screens temp-channel 42 7 --duration 3600
   pintomind screens temp-channel 42 7 --until 2025-12-31T23:59:00Z
+  pintomind screens temp-channel --all 7 --duration 1800
   pintomind screens temp-channel 42 7 --toggle`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			a := app(cmd)
+			ids, _ := cmd.Flags().GetString("ids")
+			all, _ := cmd.Flags().GetBool("all")
 
-			var screenID, channelID string
-			if ids != "" {
+			var singleScreenID, channelID string
+			if ids != "" || all {
 				if len(args) != 1 {
-					return fmt.Errorf("expected <channel-id> when using --ids")
+					return fmt.Errorf("expected <channel-id> when using --ids or --all")
 				}
 				channelID = args[0]
 			} else {
 				if len(args) != 2 {
 					return fmt.Errorf("expected <screen-id> <channel-id>")
 				}
-				screenID = args[0]
+				singleScreenID = args[0]
 				channelID = args[1]
 			}
 
@@ -359,36 +263,19 @@ func newScreensTempChannelCmd() *cobra.Command {
 				screen["temporary_channel_until"] = until
 			}
 
-			body := map[string]any{"screen": screen}
-
-			if ids != "" {
-				q := url.Values{"ids": {ids}}
-				var resp map[string]any
-				if err := a.Client.Patch("/screens/bulk?"+q.Encode(), body, &resp); err != nil {
-					return err
-				}
-				if a.JSONOutput {
-					printJSON(resp)
-				} else {
-					fmt.Printf("Set temporary channel %s on screens %s\n", channelID, ids)
-				}
-			} else {
-				var resp map[string]any
-				if err := a.Client.Patch("/screens/"+screenID, body, &resp); err != nil {
-					return err
-				}
-				if a.JSONOutput {
-					printJSON(resp)
-				} else {
-					fmt.Printf("Set temporary channel %s on screen %s\n", channelID, screenID)
-				}
+			targetIDs, bulk, err := resolveScreenIDs(cmd, singleScreenID, ids, all)
+			if err != nil {
+				return err
 			}
-			return nil
+
+			body := map[string]any{"screen": screen}
+			return sendScreenPatch(cmd, targetIDs, bulk, body,
+				fmt.Sprintf("Set temporary channel %s", channelID))
 		},
 	}
+	addTargetFlags(cmd)
 	cmd.Flags().IntVar(&duration, "duration", 0, "Duration in seconds")
 	cmd.Flags().StringVar(&until, "until", "", "ISO8601 timestamp until which override is active")
 	cmd.Flags().BoolVar(&toggle, "toggle", false, "Toggle temporary channel active state")
-	cmd.Flags().StringVar(&ids, "ids", "", "Comma-separated screen IDs for bulk operation")
 	return cmd
 }

@@ -9,11 +9,11 @@ import (
 )
 
 type Channel struct {
-	ID            int    `json:"id"`
-	Name          string `json:"name"`
-	Type          string `json:"type"`
-	OnlineScreens int    `json:"online_screens"`
-	OfflineScreens int   `json:"offline_screens"`
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	OnlineScreens  int    `json:"online_screens"`
+	OfflineScreens int    `json:"offline_screens"`
 }
 
 type ChannelsResponse struct {
@@ -137,27 +137,55 @@ func newChannelsStatsCmd() *cobra.Command {
 }
 
 func newChannelsSetThemeCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "set-theme <channel-id> <theme-id>",
-		Short: "Set the theme of a channel",
-		Args:  cobra.ExactArgs(2),
+	var all bool
+
+	cmd := &cobra.Command{
+		Use:   "set-theme [channel-id] <theme-id>",
+		Short: "Set the theme of a channel or all channels",
+		Example: `  pintomind channels set-theme 3 12
+  pintomind channels set-theme --all 12`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			themeID, err := strconv.Atoi(args[1])
+
+			var singleChannelID, themeIDStr string
+			if all {
+				if len(args) != 1 {
+					return fmt.Errorf("expected <theme-id> when using --all")
+				}
+				themeIDStr = args[0]
+			} else {
+				if len(args) != 2 {
+					return fmt.Errorf("expected <channel-id> <theme-id>")
+				}
+				singleChannelID = args[0]
+				themeIDStr = args[1]
+			}
+
+			themeID, err := strconv.Atoi(themeIDStr)
 			if err != nil {
 				return fmt.Errorf("theme-id must be an integer")
 			}
-			body := map[string]any{"channel": map[string]any{"theme_id": themeID}}
-			var resp map[string]any
-			if err := a.Client.Patch("/channels/"+args[0], body, &resp); err != nil {
+
+			channelIDs, err := resolveChannelIDs(cmd, singleChannelID, all)
+			if err != nil {
 				return err
 			}
-			if a.JSONOutput {
-				printJSON(resp)
-			} else {
-				fmt.Printf("Set theme %s on channel %s\n", args[1], args[0])
+
+			body := map[string]any{"channel": map[string]any{"theme_id": themeID}}
+			for _, id := range channelIDs {
+				var resp map[string]any
+				if err := a.Client.Patch("/channels/"+id, body, &resp); err != nil {
+					return fmt.Errorf("channel %s: %w", id, err)
+				}
+				if a.JSONOutput {
+					printJSON(resp)
+				} else {
+					fmt.Printf("Set theme %s on channel %s\n", themeIDStr, id)
+				}
 			}
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&all, "all", false, "Apply to all channels")
+	return cmd
 }
