@@ -52,6 +52,7 @@ func NewRootCmd() *cobra.Command {
 	root.PersistentFlags().StringVar(&domainOverride, "domain", "", "Override active domain")
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")
 
+	root.AddCommand(commands.NewSetupCmd())
 	root.AddCommand(commands.NewConfigCmd())
 	root.AddCommand(commands.NewMeCmd())
 	root.AddCommand(commands.NewNetworkCmd())

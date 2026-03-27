@@ -273,11 +273,12 @@ pintomind channels set-theme --all 5
 
 ## Claude Code skill
 
-A skill file is included at `.claude/skills/pintomind.md`. To make it available as a `/pintomind` slash command in any project, install it globally:
+The skill is embedded in the binary. Install it with:
 
 ```bash
-mkdir -p ~/.claude/skills
-cp .claude/skills/pintomind.md ~/.claude/skills/pintomind.md
+pintomind setup claude
 ```
 
-Claude will then know how to use the CLI to interact with your screens on your behalf.
+This writes `~/.claude/skills/pintomind.md`, making `/pintomind` available as a slash command in any Claude Code session. Use `--force` to overwrite an existing installation.
+
+Once installed, Claude can interact with your screens on your behalf — listing screens, sending commands, switching channels, and more.
