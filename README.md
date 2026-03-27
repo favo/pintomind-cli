@@ -54,27 +54,27 @@ pintomind setup completion   # install shell tab-completion
 
 ## Configuration
 
-Config is stored in `~/.config/pintomind/config.json`. You can add multiple domains with separate API keys — useful for keeping production and development environments apart.
+Config is stored in `~/.config/pintomind/config.json`. You can add multiple accounts with separate API keys — useful for keeping production and development environments apart.
 
-### Add a domain
-
-```bash
-pintomind config add app.infoskjermen.no --api-key sk-your-key
-```
-
-The first domain added becomes the default. The base URL defaults to `https://<domain>`. Override it with `--url`:
+### Add an account
 
 ```bash
-pintomind config add develop --api-key sk-dev-key --url https://develop.infoskjermen.no
+pintomind config add app.infoskjermen.no sk-your-key
 ```
 
-### Show active domain
+The first account added becomes the default. The base URL defaults to `https://<name>`. Override it with `--url`:
+
+```bash
+pintomind config add develop sk-dev-key --url https://develop.infoskjermen.no
+```
+
+### Show active account
 
 ```bash
 pintomind config show
 ```
 
-### List configured domains
+### List configured accounts
 
 ```bash
 pintomind config list
@@ -82,24 +82,24 @@ pintomind config list
 
 The active default is marked with `*`.
 
-### Switch default domain
+### Switch default account
 
 ```bash
 pintomind config use develop
 ```
 
-### Remove a domain
+### Remove an account
 
 ```bash
 pintomind config remove develop
 ```
 
-### Override domain per command
+### Override account per command
 
-Use `--domain` to target a specific domain without changing the default:
+Use `--account` to target a specific account without changing the default:
 
 ```bash
-pintomind --domain develop screens list
+pintomind --account develop screens list
 ```
 
 ---
@@ -108,7 +108,7 @@ pintomind --domain develop screens list
 
 | Flag | Description |
 |------|-------------|
-| `--domain <name>` | Override active domain for this command |
+| `--account <name>` | Override active account for this command |
 | `--json` | Output raw JSON (useful for scripting and piping to `jq`) |
 | `--verbose` / `-v` | Print HTTP request URL and response status to stderr |
 

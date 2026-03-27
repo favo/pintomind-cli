@@ -7,19 +7,19 @@ You are an expert at using the `pintomind` CLI to interact with the Pintomind / 
 
 ## Setup
 
-Config is stored in `~/.config/pintomind/config.json`. Multiple domains are supported.
+Config is stored in `~/.config/pintomind/config.json`. Multiple accounts are supported.
 
 ```bash
-pintomind config add app.infoskjermen.no --api-key sk-xxx
-pintomind config add develop --api-key sk-dev --url https://develop.infoskjermen.no
+pintomind config add app.infoskjermen.no sk-xxx
+pintomind config add develop sk-dev --url https://develop.infoskjermen.no
 pintomind config use develop
 pintomind config list
-pintomind config show   # show active domain and masked API key
+pintomind config show   # show active account and masked API key
 ```
 
 ## Global Flags
 
-- `--domain <name>` — override active domain for a single command
+- `--account <name>` — override active account for a single command
 - `--json` — output raw JSON
 - `--verbose` / `-v` — print HTTP request URL and response status to stderr
 
@@ -165,5 +165,5 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Wait for a screen after reboot: `pintomind screens reboot 42 && pintomind screens wait-online 42`
 - Apply a theme to every channel: `pintomind channels set-theme --all <theme-id>`
 - Inspect valid resource fields: `pintomind schemas show text_slide`
-- Use `--domain develop` to target the dev environment without changing your default.
+- Use `--account develop` to target the dev environment without changing your default.
 - Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens) are required for channel posts.
