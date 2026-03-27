@@ -216,13 +216,30 @@ pintomind themes stats
 
 ## Shell completion
 
+Install completions for your user without needing root:
+
 ```bash
-pintomind completion bash   # Bash
-pintomind completion zsh    # Zsh
-pintomind completion fish   # Fish
+pintomind completion install        # auto-detects your shell
+pintomind completion install bash
+pintomind completion install zsh
+pintomind completion install fish
 ```
 
-Follow the instructions printed by each command to enable completion in your shell.
+**Bash** — writes to `~/.local/share/bash-completion/completions/pintomind`, auto-loaded by bash-completion 2.x. If it doesn't activate immediately, add to `~/.bashrc`:
+```bash
+source ~/.local/share/bash-completion/completions/pintomind
+```
+
+**Zsh** — writes to `~/.zfunc/_pintomind`. Make sure your `~/.zshrc` contains:
+```zsh
+fpath=(~/.zfunc $fpath)
+autoload -U compinit && compinit
+```
+Then reload: `exec zsh`
+
+**Fish** — writes to `~/.config/fish/completions/pintomind.fish`, auto-loaded immediately.
+
+To just print the completion script (e.g. for manual setup), use `pintomind completion bash|zsh|fish` without `install`.
 
 ---
 
