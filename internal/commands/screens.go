@@ -29,6 +29,7 @@ func NewScreensCmd() *cobra.Command {
 	// Read
 	cmd.AddCommand(newScreensListCmd())
 	cmd.AddCommand(newScreensShowCmd())
+	cmd.AddCommand(newScreensStatsCmd())
 
 	// Channel assignment
 	cmd.AddCommand(newScreensSetChannelCmd())
@@ -166,6 +167,31 @@ func newScreensShowCmd() *cobra.Command {
 				return err
 			}
 			printJSON(resp)
+			return nil
+		},
+	}
+}
+
+func newScreensStatsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "stats",
+		Short: "Show screen online/offline counts",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			var resp map[string]any
+			if err := a.Client.Get("/screens/stats", nil, &resp); err != nil {
+				return err
+			}
+			if a.JSONOutput {
+				printJSON(resp)
+				return nil
+			}
+			if online, ok := resp["online"]; ok {
+				fmt.Printf("Online:  %v\n", online)
+			}
+			if offline, ok := resp["offline"]; ok {
+				fmt.Printf("Offline: %v\n", offline)
+			}
 			return nil
 		},
 	}
