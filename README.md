@@ -4,19 +4,27 @@ Command-line interface for the [Pintomind / Infoskjermen](https://infoskjermen.n
 
 ## Installation
 
-### Prerequisites
-
-- [Go](https://go.dev/) 1.22+ (or use [mise](https://mise.jdx.dev/): `mise install go`)
-
-### Install from source
+### One-line install (Linux and macOS)
 
 ```bash
-git clone https://github.com/jonh/pintomind-cli
+curl -fsSL https://raw.githubusercontent.com/favo/pintomind-cli/main/install.sh | sh
+```
+
+Downloads the pre-built binary for your OS and architecture to `~/.local/bin/pintomind`. Override the install directory with `INSTALL_DIR`:
+
+```bash
+INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/favo/pintomind-cli/main/install.sh | sh
+```
+
+### Build from source
+
+Requires [Go](https://go.dev/) 1.22+ (or `mise install go`):
+
+```bash
+git clone https://github.com/favo/pintomind-cli
 cd pintomind-cli
 make install
 ```
-
-This builds the binary and installs it to `~/.local/bin/pintomind`. Make sure that directory is on your `$PATH`.
 
 ### Verify
 
