@@ -29,7 +29,8 @@ func newConfigAddCmd() *cobra.Command {
 		Short: "Add a domain with its API key",
 		Args:  cobra.ExactArgs(1),
 		Example: `  pintomind config add app.infoskjermen.no --api-key sk-xxx
-  pintomind config add develop --api-key sk-dev --url https://develop.infoskjermen.no`,
+  pintomind config add develop --api-key sk-dev --url https://develop.infoskjermen.no
+  pintomind config use develop`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			domain := args[0]
 
