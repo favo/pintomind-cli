@@ -1,8 +1,15 @@
 package commands
 
 import (
+	"fmt"
+	"regexp"
+
 	"github.com/spf13/cobra"
 )
+
+// schemaIDRe extracts schema IDs from the HTML links the /schemas endpoint returns,
+// e.g. <a href='/api/v1/schemas/calendar_events'>calendar_events</a>
+var schemaIDRe = regexp.MustCompile(`href='[^']+/schemas/([^']+)'`)
 
 func NewSchemasCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -20,11 +27,19 @@ func newSchemasListCmd() *cobra.Command {
 		Short: "List available schema keys",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
-			var resp map[string]any
-			if err := a.Client.Get("/schemas", nil, &resp); err != nil {
+			// The /schemas endpoint returns HTML, not JSON.
+			body, _, err := a.Client.DoRaw("GET", "/schemas", nil)
+			if err != nil {
 				return err
 			}
-			printJSON(resp)
+			matches := schemaIDRe.FindAllSubmatch(body, -1)
+			if len(matches) == 0 {
+				fmt.Println("No schemas found.")
+				return nil
+			}
+			for _, m := range matches {
+				fmt.Println(string(m[1]))
+			}
 			return nil
 		},
 	}
