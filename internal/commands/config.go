@@ -17,6 +17,7 @@ func NewConfigCmd() *cobra.Command {
 	cmd.AddCommand(newConfigRemoveCmd())
 	cmd.AddCommand(newConfigListCmd())
 	cmd.AddCommand(newConfigUseCmd())
+	cmd.AddCommand(newConfigShowCmd())
 	return cmd
 }
 
@@ -141,6 +142,33 @@ func newConfigUseCmd() *cobra.Command {
 				return err
 			}
 			fmt.Printf("Default domain set to %q\n", domain)
+			return nil
+		},
+	}
+}
+
+func newConfigShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "show",
+		Short: "Show the active domain and its configuration",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			// Respect --domain override from parent flags
+			domainOverride, _ := cmd.Root().PersistentFlags().GetString("domain")
+			name, domain, err := cfg.ActiveDomain(domainOverride)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Domain:  %s\n", name)
+			fmt.Printf("URL:     %s\n", domain.BaseURL)
+			masked := domain.APIKey
+			if len(masked) > 8 {
+				masked = masked[:4] + "..." + masked[len(masked)-4:]
+			}
+			fmt.Printf("API key: %s\n", masked)
 			return nil
 		},
 	}
