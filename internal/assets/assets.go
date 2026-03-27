@@ -4,5 +4,5 @@ package assets
 
 import _ "embed"
 
-//go:embed pintomind-skill.md
+//go:embed SKILL.md
 var ClaudeSkill []byte

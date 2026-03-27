@@ -30,7 +30,8 @@ func newSetupClaudeCmd() *cobra.Command {
 Once installed, Claude Code can use the /pintomind slash command to interact
 with your screens on your behalf from any project.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			dest := filepath.Join(os.Getenv("HOME"), ".claude", "skills", "pintomind.md")
+			skillDir := filepath.Join(os.Getenv("HOME"), ".claude", "skills", "pintomind")
+			dest := filepath.Join(skillDir, "SKILL.md")
 
 			if _, err := os.Stat(dest); err == nil && !force {
 				fmt.Printf("Skill already installed at %s\n", dest)
@@ -38,11 +39,17 @@ with your screens on your behalf from any project.`,
 				return nil
 			}
 
-			if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+			if err := os.MkdirAll(skillDir, 0755); err != nil {
 				return fmt.Errorf("creating skills directory: %w", err)
 			}
 			if err := os.WriteFile(dest, assets.ClaudeSkill, 0644); err != nil {
 				return fmt.Errorf("writing skill file: %w", err)
+			}
+
+			// Remove stale flat file from older installs
+			stale := filepath.Join(os.Getenv("HOME"), ".claude", "skills", "pintomind.md")
+			if _, err := os.Stat(stale); err == nil {
+				_ = os.Remove(stale)
 			}
 
 			fmt.Printf("Installed pintomind skill to %s\n\n", dest)
