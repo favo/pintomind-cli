@@ -39,6 +39,7 @@ func newResourcesListCmd() *cobra.Command {
 			if sortBy != "" {
 				q.Set("sort_by", sortBy)
 			}
+			applyPagination(cmd, q)
 			var resp map[string]any
 			if err := a.Client.Get("/resources", q, &resp); err != nil {
 				return err
@@ -47,8 +48,9 @@ func newResourcesListCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&resourceType, "type", "", "Filter by resource type alias")
+	cmd.Flags().StringVar(&resourceType, "type", "", "Filter by resource type alias (comma-separated for multiple)")
 	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name:asc)")
+	addPaginationFlags(cmd)
 	return cmd
 }
 

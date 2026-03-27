@@ -122,6 +122,7 @@ func newScreensListCmd() *cobra.Command {
 			if offline {
 				q.Set("offline", "true")
 			}
+			applyPagination(cmd, q)
 
 			var resp ScreensResponse
 			if err := a.Client.Get("/screens", q, &resp); err != nil {
@@ -152,6 +153,7 @@ func newScreensListCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&online, "online", false, "Show only online screens")
 	cmd.Flags().BoolVar(&offline, "offline", false, "Show only offline screens")
+	addPaginationFlags(cmd)
 	return cmd
 }
 

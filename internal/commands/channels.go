@@ -50,6 +50,7 @@ func newChannelsListCmd() *cobra.Command {
 			if sortBy != "" {
 				q.Set("sort_by", sortBy)
 			}
+			applyPagination(cmd, q)
 
 			var resp ChannelsResponse
 			if err := a.Client.Get("/channels", q, &resp); err != nil {
@@ -78,6 +79,7 @@ func newChannelsListCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&fields, "fields", "", "Comma-separated fields to include")
 	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name, name:desc)")
+	addPaginationFlags(cmd)
 	return cmd
 }
 

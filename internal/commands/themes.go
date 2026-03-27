@@ -41,6 +41,7 @@ func newThemesListCmd() *cobra.Command {
 			if sortBy != "" {
 				q.Set("sort_by", sortBy)
 			}
+			applyPagination(cmd, q)
 
 			var resp ThemesResponse
 			if err := a.Client.Get("/themes", q, &resp); err != nil {
@@ -62,6 +63,7 @@ func newThemesListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name:asc)")
+	addPaginationFlags(cmd)
 	return cmd
 }
 

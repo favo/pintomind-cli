@@ -91,3 +91,19 @@ func addTargetFlags(cmd *cobra.Command) (ids *string, all *bool) {
 	cmd.Flags().BoolVar(all, "all", false, "Apply to all screens")
 	return
 }
+
+// addPaginationFlags attaches --page and --per-page to a list command.
+func addPaginationFlags(cmd *cobra.Command) {
+	cmd.Flags().Int("page", 0, "Page number")
+	cmd.Flags().Int("per-page", 0, "Results per page (API default: 200)")
+}
+
+// applyPagination adds page/per-page to a query if set.
+func applyPagination(cmd *cobra.Command, q url.Values) {
+	if p, _ := cmd.Flags().GetInt("page"); p > 0 {
+		q.Set("page", strconv.Itoa(p))
+	}
+	if pp, _ := cmd.Flags().GetInt("per-page"); pp > 0 {
+		q.Set("per_page", strconv.Itoa(pp))
+	}
+}
