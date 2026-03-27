@@ -1,0 +1,83 @@
+package cli
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/spf13/cobra"
+
+	"favo/pintomind-cli/internal/api"
+	"favo/pintomind-cli/internal/appctx"
+	"favo/pintomind-cli/internal/commands"
+	"favo/pintomind-cli/internal/config"
+)
+
+var version = "dev"
+
+func NewRootCmd() *cobra.Command {
+	var domainOverride string
+	var jsonOutput bool
+
+	root := &cobra.Command{
+		Use:     "pintomind",
+		Short:   "CLI for the Pintomind / Infoskjermen API",
+		Version: version,
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			// Skip app setup for config subcommands (no API client needed)
+			if isConfigCmd(cmd) {
+				return nil
+			}
+
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+
+			domainName, domain, err := cfg.ActiveDomain(domainOverride)
+			if err != nil {
+				return err
+			}
+
+			app := &appctx.App{
+				Config:       cfg,
+				Client:       api.New(domain.BaseURL, domain.APIKey),
+				ActiveDomain: domainName,
+				JSONOutput:   jsonOutput,
+			}
+			cmd.SetContext(appctx.WithApp(cmd.Context(), app))
+			return nil
+		},
+	}
+
+	root.PersistentFlags().StringVar(&domainOverride, "domain", "", "Override active domain")
+	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")
+
+	root.AddCommand(commands.NewConfigCmd())
+	root.AddCommand(commands.NewMeCmd())
+	root.AddCommand(commands.NewNetworkCmd())
+	root.AddCommand(commands.NewScreensCmd())
+	root.AddCommand(commands.NewChannelsCmd())
+	root.AddCommand(commands.NewResourcesCmd())
+	root.AddCommand(commands.NewThemesCmd())
+
+	return root
+}
+
+func Execute() {
+	if err := NewRootCmd().Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+// isConfigCmd returns true when cmd is or lives under the "config" command.
+func isConfigCmd(cmd *cobra.Command) bool {
+	c := cmd
+	for c != nil {
+		if c.Name() == "config" {
+			return true
+		}
+		c = c.Parent()
+	}
+	return false
+}
