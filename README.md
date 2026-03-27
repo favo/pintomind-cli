@@ -287,6 +287,6 @@ The skill is embedded in the binary. Install it with:
 pintomind setup claude
 ```
 
-This writes `~/.claude/skills/pintomind.md`, making `/pintomind` available as a slash command in any Claude Code session. Use `--force` to overwrite an existing installation.
+This writes `~/.claude/skills/pintomind/SKILL.md`, making `/pintomind` available as a slash command in any Claude Code session. Use `--force` to overwrite an existing installation.
 
 Once installed, Claude can interact with your screens on your behalf — listing screens, sending commands, switching channels, and more.
