@@ -20,7 +20,7 @@ func NewMeCmd() *cobra.Command {
 				printJSON(result)
 				return nil
 			}
-			fmt.Printf("Domain:  %s\n", a.ActiveDomain)
+			fmt.Printf("Account: %s\n", a.ActiveAccount)
 			if user, ok := result["user"].(map[string]any); ok {
 				fmt.Printf("User:    %v\n", user["email"])
 			}

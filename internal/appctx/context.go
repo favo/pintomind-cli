@@ -12,7 +12,7 @@ type key struct{}
 type App struct {
 	Config       *config.Config
 	Client       *api.Client
-	ActiveDomain string
+	ActiveAccount string
 	JSONOutput   bool
 	Verbose      bool
 }

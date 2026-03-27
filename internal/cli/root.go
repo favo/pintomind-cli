@@ -15,7 +15,7 @@ import (
 var version = "dev"
 
 func NewRootCmd() *cobra.Command {
-	var domainOverride string
+	var accountOverride string
 	var jsonOutput bool
 	var verbose bool
 
@@ -34,7 +34,7 @@ func NewRootCmd() *cobra.Command {
 				return err
 			}
 
-			domainName, domain, err := cfg.ActiveDomain(domainOverride)
+			domainName, domain, err := cfg.ActiveDomain(accountOverride)
 			if err != nil {
 				return err
 			}
@@ -44,7 +44,7 @@ func NewRootCmd() *cobra.Command {
 			app := &appctx.App{
 				Config:       cfg,
 				Client:       client,
-				ActiveDomain: domainName,
+				ActiveAccount: domainName,
 				JSONOutput:   jsonOutput,
 				Verbose:      verbose,
 			}
@@ -53,7 +53,7 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().StringVar(&domainOverride, "domain", "", "Override active domain")
+	root.PersistentFlags().StringVar(&accountOverride, "account", "", "Override active account")
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show HTTP request and response details")
 
