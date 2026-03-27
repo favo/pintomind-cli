@@ -41,10 +41,10 @@ Config is stored in `~/.config/pintomind/config.json`. You can add multiple doma
 ### Add a domain
 
 ```bash
-pintomind config add infoskjermen.no --api-key sk-your-key
+pintomind config add app.infoskjermen.no --api-key sk-your-key
 ```
 
-The first domain added becomes the default. The base URL defaults to `https://app.<domain>`. Override it with `--url`:
+The first domain added becomes the default. The base URL defaults to `https://<domain>`. Override it with `--url`:
 
 ```bash
 pintomind config add develop --api-key sk-dev-key --url https://develop.infoskjermen.no

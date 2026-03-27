@@ -28,8 +28,8 @@ func newConfigAddCmd() *cobra.Command {
 		Use:   "add <domain>",
 		Short: "Add a domain with its API key",
 		Args:  cobra.ExactArgs(1),
-		Example: `  pintomind config add infoskjermen.no --api-key sk-xxx
-  pintomind config add develop.infoskjermen.no --api-key sk-dev --url https://develop.infoskjermen.no`,
+		Example: `  pintomind config add app.infoskjermen.no --api-key sk-xxx
+  pintomind config add develop --api-key sk-dev --url https://develop.infoskjermen.no`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			domain := args[0]
 
@@ -40,7 +40,7 @@ func newConfigAddCmd() *cobra.Command {
 
 			url := baseURL
 			if url == "" {
-				url = "https://app." + domain
+				url = "https://" + domain
 			}
 
 			cfg.Domains[domain] = config.Domain{
@@ -64,7 +64,7 @@ func newConfigAddCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key for this domain (required)")
-	cmd.Flags().StringVar(&baseURL, "url", "", "Base URL (defaults to https://<domain>)")
+	cmd.Flags().StringVar(&baseURL, "url", "", "Base URL (defaults to https://<domain>, e.g. https://app.infoskjermen.no)")
 	_ = cmd.MarkFlagRequired("api-key")
 	return cmd
 }
@@ -106,7 +106,7 @@ func newConfigListCmd() *cobra.Command {
 				return err
 			}
 			if len(cfg.Domains) == 0 {
-				fmt.Println("No domains configured. Run: pintomind config add <domain> --api-key <key>")
+				fmt.Println("No domains configured. Run: pintomind config add app.infoskjermen.no --api-key <key>")
 				return nil
 			}
 			for name, d := range cfg.Domains {

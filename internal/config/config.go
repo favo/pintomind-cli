@@ -71,7 +71,7 @@ func (c *Config) ActiveDomain(override string) (string, Domain, error) {
 		name = c.DefaultDomain
 	}
 	if name == "" {
-		return "", Domain{}, fmt.Errorf("no domain configured — run: pintomind config add <domain> --api-key <key>")
+		return "", Domain{}, fmt.Errorf("no domain configured — run: pintomind config add app.infoskjermen.no --api-key <key>")
 	}
 	d, ok := c.Domains[name]
 	if !ok {
