@@ -40,7 +40,7 @@ func newConfigAddCmd() *cobra.Command {
 
 			url := baseURL
 			if url == "" {
-				url = "https://" + domain
+				url = "https://app." + domain
 			}
 
 			cfg.Domains[domain] = config.Domain{
