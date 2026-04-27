@@ -1,25 +1,27 @@
 ---
 name: pintomind
-description: Interact with Pintomind / Infoskjermen screens, channels, resources, and themes via the pintomind CLI. Use for ANY Pintomind question or action.
+description: Interact with Pintomind / Infoskjermen screens, channels, resources, media, and themes via the pintomind CLI. Use for ANY Pintomind question or action.
 ---
 
 You are an expert at using the `pintomind` CLI to interact with the Pintomind / Infoskjermen API.
 
 ## Setup
 
-Config is stored in `~/.config/pintomind/config.json`. Multiple domains are supported.
+Config is stored in `~/.config/pintomind/config.json`. Multiple accounts are supported.
 
 ```bash
-pintomind config add infoskjermen.no --api-key sk-xxx
-pintomind config add develop --api-key sk-dev --url https://develop.infoskjermen.no
+pintomind config add app.infoskjermen.no sk-xxx
+pintomind config add develop sk-dev --url https://develop.infoskjermen.no
 pintomind config use develop
 pintomind config list
+pintomind config show   # show active account and masked API key
 ```
 
 ## Global Flags
 
-- `--domain <name>` — override active domain for a single command
+- `--account <name>` — override active account for a single command
 - `--json` — output raw JSON
+- `--verbose` / `-v` — print HTTP request URL and response status to stderr
 
 ## Screens
 
@@ -27,7 +29,11 @@ pintomind config list
 pintomind screens list
 pintomind screens list --online
 pintomind screens list --offline
+pintomind screens list --page 2 --per-page 50
 pintomind screens show <id>
+pintomind screens stats                  # online/offline counts
+pintomind screens watch                  # live-refresh every 5s (--interval N)
+pintomind screens wait-online <id>       # block until online (--timeout N)
 ```
 
 ### Targeting
@@ -89,6 +95,7 @@ pintomind screens temp-channel <screen-id> <channel-id> --toggle
 ```bash
 pintomind channels list
 pintomind channels list --sort-by name
+pintomind channels list --page 2 --per-page 50
 pintomind channels show <id>
 pintomind channels posts <id>           # account token required
 pintomind channels stats                # requires channels:read:stats scope
@@ -102,6 +109,8 @@ pintomind channels set-theme --all <theme-id>
 ```bash
 pintomind resources list
 pintomind resources list --type text_slide
+pintomind resources list --type text_slide,calendar_events   # comma-separated
+pintomind resources list --page 2 --per-page 50
 pintomind resources show <id>
 pintomind resources stats
 pintomind resources refresh <id>
@@ -113,10 +122,50 @@ pintomind resources delete <id>
 pintomind resources delete <id> --force
 ```
 
+## Schemas
+
+Inspect valid fields for resource types:
+
+```bash
+pintomind schemas list
+pintomind schemas show <id>   # e.g. pintomind schemas show text_slide
+```
+
+## Media Collections
+
+```bash
+pintomind media-collections list
+pintomind media-collections list --sort-by title
+pintomind media-collections show <id>
+pintomind media-collections create --title "Campaign photos" --category image
+pintomind media-collections update <id> --title "Updated title"
+pintomind media-collections delete <id>
+pintomind media-collections delete <id> --force
+```
+
+Categories are `background`, `logo`, `image`, `video`, and `document`.
+
+## Media
+
+```bash
+pintomind media list <collection-id>
+pintomind media list <collection-id> --sort-by created_at:desc
+pintomind media show <id>
+pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"
+pintomind media upload <collection-id> ./deck.pdf --extract-pages
+pintomind media update <id> --name "Updated name"
+pintomind media update <id> --collection-id <target-collection-id>
+pintomind media delete <id>
+pintomind media delete <id> --force
+```
+
+Use `media upload` for normal file uploads. It handles the direct upload flow and creates the media record.
+
 ## Themes
 
 ```bash
 pintomind themes list
+pintomind themes list --page 2
 pintomind themes show <id>
 pintomind themes stats
 ```
@@ -128,10 +177,24 @@ pintomind me
 pintomind network
 ```
 
+## Raw API access
+
+For endpoints not yet covered by a dedicated command:
+
+```bash
+pintomind api /screens
+pintomind api /screens/42
+pintomind api GET /channels?sort_by=name
+echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
+```
+
 ## Tips
 
 - Find screen IDs: `pintomind screens list --json | jq '.items[] | {id, name}'`
 - Reload all screens at once: `pintomind screens reload --all`
+- Wait for a screen after reboot: `pintomind screens reboot 42 && pintomind screens wait-online 42`
 - Apply a theme to every channel: `pintomind channels set-theme --all <theme-id>`
-- Use `--domain develop` to target the dev environment without changing your default.
+- Upload a file to media: `pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"`
+- Inspect valid resource fields: `pintomind schemas show text_slide`
+- Use `--account develop` to target the dev environment without changing your default.
 - Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens) are required for channel posts.
