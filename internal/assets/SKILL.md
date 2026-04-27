@@ -157,6 +157,7 @@ pintomind media list <collection-id>
 pintomind media list <collection-id> --sort-by created_at:desc
 pintomind media show <id>
 pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"
+pintomind media upload <collection-id> https://example.com/photo.jpg --name "Lobby photo"
 pintomind media upload <collection-id> ./deck.pdf --extract-pages
 pintomind media update <id> --name "Updated name"
 pintomind media update <id> --collection-id <target-collection-id>
@@ -164,7 +165,7 @@ pintomind media delete <id>
 pintomind media delete <id> --force
 ```
 
-Use `media upload` for normal file uploads. It handles the direct upload flow and creates the media record.
+Use `media upload` for normal local file or URL uploads. It handles download, checksum, the direct upload flow, and media record creation.
 
 ## Posts
 
