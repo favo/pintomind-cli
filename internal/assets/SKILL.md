@@ -108,15 +108,15 @@ pintomind channels set-theme --all <theme-id>
 
 ```bash
 pintomind resources list
-pintomind resources list --type text_slide
-pintomind resources list --type text_slide,calendar_events   # comma-separated
+pintomind resources list --type text
+pintomind resources list --type text,calendar_events   # comma-separated
 pintomind resources list --page 2 --per-page 50
 pintomind resources show <id>
 pintomind resources stats
 pintomind resources refresh <id>
 
-pintomind resources create --type text_slide --data '{"title":"Hello","body":"World"}'
-pintomind resources update <id> --data '{"title":"Updated"}'
+pintomind resources create --type text --data '{"label":"Hello","text":"World"}'
+pintomind resources update <id> --data '{"label":"Updated"}'
 pintomind resources append <id> --items '[{"text":"item 1"}]'
 pintomind resources delete <id>
 pintomind resources delete <id> --force
@@ -128,13 +128,16 @@ Inspect valid fields for resource and post types:
 
 ```bash
 pintomind schemas list
-pintomind schemas show <id>           # e.g. pintomind schemas show text_slide
+pintomind schemas show <id>           # e.g. pintomind schemas show text
 pintomind schemas show post_<alias>   # e.g. pintomind schemas show post_image
+pintomind schemas show grid_templates # named grid layouts for plain post variations
 ```
 
-Resource schema keys: `calendar`, `calendar_events`, `external_image`, `external_webpage`, `feed`, `feed_items`, `html`, `location`, `qr_code`, `text`, `youtube`.
+Resource schema keys: `calendar`, `calendar_events`, `entur`, `external_image`, `external_webpage`, `feed`, `feed_items`, `html`, `location`, `qr_code`, `text`, `youtube`.
 
 Post schema keys: `post_plain`, `post_image`, `post_video`, `post_youtube`, `post_iframe`, `post_calendar`, `post_clock`, `post_world_clock`, `post_counter`, `post_forecast`, `post_feed`, `post_entur`, `post_power_price`.
+
+Reference keys: `grid_templates` — catalog of named grid layouts used by `post_plain` variation.
 
 ## Media Collections
 
@@ -185,7 +188,9 @@ pintomind posts delete <id> --force
 
 ### Creating posts
 
-`posts create` takes a `--type` (post type alias) and a `--data` JSON object describing the post. The CLI wraps it in `{"type": ..., "post": {...}}` for you. Resources referenced in `resource_ids` must already exist (create them via `pintomind resources create` or upload via `pintomind media upload`).
+`posts create` takes a `--type` (post type alias) and a `--data` JSON object describing the post. The CLI wraps it in `{"type": ..., "post": {...}}` for you.
+
+**Important:** all post fields — including type-specific ones — are flat inside the `post` object. Do not wrap them in an `options` sub-object.
 
 Always inspect the schema for the post type first to learn what fields are accepted:
 
@@ -195,7 +200,7 @@ pintomind schemas show post_plain
 pintomind schemas show post_calendar
 ```
 
-Common shared fields: `name`, `title`, `duration`, `show_title`, `area`. Type-specific options live under `options`.
+Common shared fields: `name`, `title`, `duration`, `show_title`, `area`.
 
 ```bash
 # Plain text post
@@ -203,29 +208,32 @@ pintomind posts create --type plain --data '{
   "name":"Welcome",
   "title":"Hello",
   "content":"Welcome to the office",
-  "options":{"justification":"center","fontsize":"large"}
+  "justification":"center",
+  "fontsize":"large"
 }'
 
-# Image post (resource_ids must reference MediaResource or ExternalImageResource IDs)
+# Image post — use media_resources with media_id values from `pintomind media upload`
 pintomind posts create --type image --data '{
   "name":"Spring campaign",
   "title":"New collection",
   "duration_per_item":7,
-  "resource_ids":[42,43],
-  "options":{"aspect_ratio":"fill","grid_layout":1}
+  "media_resources":[{"media_id":42},{"media_id":43}],
+  "aspect_ratio":"fill",
+  "grid_layout":1
 }'
 
-# Video post (max 1 VideoResource in resource_ids)
+# Video post — max 1 item in media_resources
 pintomind posts create --type video --data '{
   "name":"Promo",
-  "resource_ids":[101],
-  "options":{"sound":true}
+  "media_resources":[{"media_id":101}],
+  "sound":true
 }'
 
 # Clock post (no resources)
 pintomind posts create --type clock --data '{
   "name":"Lobby clock",
-  "options":{"clock_variant":"analog","show_date":true}
+  "clock_variant":"analog",
+  "show_date":true
 }'
 
 # Calendar post
@@ -234,7 +242,8 @@ pintomind posts create --type calendar --data '{
   "template":"list",
   "max_items":5,
   "resource_ids":[55],
-  "options":{"limit_days":1,"show_location":true}
+  "limit_days":1,
+  "show_location":true
 }'
 ```
 
@@ -244,7 +253,7 @@ The post `type` cannot be changed after creation. Pass only the fields you want 
 
 ```bash
 pintomind posts update 123 --data '{"title":"Updated title"}'
-pintomind posts update 123 --data '{"options":{"sound":false}}'
+pintomind posts update 123 --data '{"sound":false}'
 ```
 
 ### Publishing posts to channels
@@ -263,11 +272,11 @@ pintomind posts unpublish <post-id> <publication-id> --force
 ### Typical end-to-end flow
 
 ```bash
-# 1. Upload an image to a media collection (resource_id is the returned media ID)
+# 1. Upload an image to a media collection
 pintomind media upload 42 ./photo.jpg --name "Lobby photo" --json | jq '.media.id'
 
-# 2. Create an image post that uses that media
-pintomind posts create --type image --data '{"name":"Lobby","resource_ids":[<id>],"duration_per_item":7}'
+# 2. Create an image post using that media ID
+pintomind posts create --type image --data '{"name":"Lobby","media_resources":[{"media_id":<id>}],"duration_per_item":7}'
 
 # 3. Publish it to a channel
 pintomind posts publish <post-id> <channel-id>
@@ -307,8 +316,10 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Wait for a screen after reboot: `pintomind screens reboot 42 && pintomind screens wait-online 42`
 - Apply a theme to every channel: `pintomind channels set-theme --all <theme-id>`
 - Upload a file to media: `pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"`
-- Inspect valid resource fields: `pintomind schemas show text_slide`
+- Inspect valid resource fields: `pintomind schemas show text`
 - Inspect valid post fields: `pintomind schemas show post_image` (prefix `post_`)
 - Publishing is separate from creating: `posts create` then `posts publish <post-id> <channel-id>`
+- Image and video posts use `media_resources:[{"media_id":...}]`, not `resource_ids`
+- Post fields are always flat inside `post` — no `options` sub-object
 - Use `--account develop` to target the dev environment without changing your default.
-- Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens) are required for channel posts.
+- Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens) are required for posts and channel posts.
