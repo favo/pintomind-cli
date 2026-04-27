@@ -332,32 +332,37 @@ func newMediaUploadCmd() *cobra.Command {
 	var extractPages bool
 
 	cmd := &cobra.Command{
-		Use:   "upload <collection-id> <file>",
-		Short: "Upload a file to a media collection",
+		Use:   "upload <collection-id> <file-or-url>",
+		Short: "Upload a file or URL to a media collection",
 		Example: `  pintomind media upload 42 ./cat.jpg --name "Cat photo"
+  pintomind media upload 42 https://example.com/cat.jpg --name "Cat photo"
   pintomind media upload 42 ./deck.pdf --extract-pages`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
 			collectionID := args[0]
-			path := args[1]
+			input := args[1]
 
-			metadata, err := fileUploadMetadata(path, contentType)
+			if !a.JSONOutput && isHTTPURL(input) {
+				fmt.Fprintf(os.Stderr, "Downloading %s...\n", input)
+			}
+			source, err := prepareUploadSource(input, contentType, a.Client.HTTPClient)
 			if err != nil {
 				return err
 			}
+			defer source.Close()
 
 			if !a.JSONOutput {
-				fmt.Fprintf(os.Stderr, "Creating upload for %s (%s)...\n", metadata.filename, formatBytes(metadata.byteSize))
+				fmt.Fprintf(os.Stderr, "Creating upload for %s (%s)...\n", source.metadata.filename, formatBytes(source.metadata.byteSize))
 			}
 
 			var upload directUploadResponse
 			body := map[string]any{
 				"blob": map[string]any{
-					"filename":     metadata.filename,
-					"content_type": metadata.contentType,
-					"byte_size":    metadata.byteSize,
-					"checksum":     metadata.checksum,
+					"filename":     source.metadata.filename,
+					"content_type": source.metadata.contentType,
+					"byte_size":    source.metadata.byteSize,
+					"checksum":     source.metadata.checksum,
 				},
 			}
 			if err := a.Client.Post("/direct_uploads", body, &upload); err != nil {
@@ -367,7 +372,7 @@ func newMediaUploadCmd() *cobra.Command {
 				return fmt.Errorf("direct upload response did not include signed_id and upload URL")
 			}
 
-			file, err := os.Open(path)
+			file, err := os.Open(source.path)
 			if err != nil {
 				return err
 			}
@@ -376,7 +381,7 @@ func newMediaUploadCmd() *cobra.Command {
 			if !a.JSONOutput {
 				fmt.Fprintf(os.Stderr, "Uploading bytes...\n")
 			}
-			if err := a.Client.PutDirectUpload(upload.DirectUpload.URL, upload.DirectUpload.Headers, file, metadata.byteSize); err != nil {
+			if err := a.Client.PutDirectUpload(upload.DirectUpload.URL, upload.DirectUpload.Headers, file, source.metadata.byteSize); err != nil {
 				return err
 			}
 
@@ -399,7 +404,7 @@ func newMediaUploadCmd() *cobra.Command {
 			if a.JSONOutput {
 				printJSON(resp)
 			} else if media, ok := resp["media"].(map[string]any); ok {
-				fmt.Printf("Uploaded media %v: %v\n", media["id"], firstNonEmpty(fmt.Sprint(media["name"]), metadata.filename))
+				fmt.Printf("Uploaded media %v: %v\n", media["id"], firstNonEmpty(fmt.Sprint(media["name"]), source.metadata.filename))
 			} else {
 				printJSON(resp)
 			}
@@ -543,7 +548,129 @@ type uploadMetadata struct {
 	checksum    string
 }
 
+type uploadSource struct {
+	path     string
+	metadata uploadMetadata
+	cleanup  func() error
+}
+
+func (s uploadSource) Close() error {
+	if s.cleanup == nil {
+		return nil
+	}
+	return s.cleanup()
+}
+
+func prepareUploadSource(input, contentTypeOverride string, httpClient *http.Client) (uploadSource, error) {
+	if isHTTPURL(input) {
+		return downloadUploadSource(input, contentTypeOverride, httpClient)
+	}
+
+	metadata, err := fileUploadMetadataFromPath(input, filepath.Base(input), "", contentTypeOverride)
+	if err != nil {
+		return uploadSource{}, err
+	}
+	return uploadSource{path: input, metadata: metadata}, nil
+}
+
+func downloadUploadSource(rawURL, contentTypeOverride string, httpClient *http.Client) (uploadSource, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return uploadSource{}, err
+	}
+
+	req, err := http.NewRequest("GET", rawURL, nil)
+	if err != nil {
+		return uploadSource{}, err
+	}
+
+	downloadClient := http.DefaultClient
+	if httpClient != nil {
+		clientCopy := *httpClient
+		clientCopy.Timeout = 0
+		downloadClient = &clientCopy
+	}
+
+	resp, err := downloadClient.Do(req)
+	if err != nil {
+		return uploadSource{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return uploadSource{}, fmt.Errorf("downloading %s failed: HTTP %d", rawURL, resp.StatusCode)
+	}
+
+	tempFile, err := os.CreateTemp("", "pintomind-upload-*")
+	if err != nil {
+		return uploadSource{}, err
+	}
+	tempPath := tempFile.Name()
+	cleanup := func() error {
+		return os.Remove(tempPath)
+	}
+
+	if _, err := io.Copy(tempFile, resp.Body); err != nil {
+		tempFile.Close()
+		cleanup()
+		return uploadSource{}, fmt.Errorf("downloading %s: %w", rawURL, err)
+	}
+	if err := tempFile.Close(); err != nil {
+		cleanup()
+		return uploadSource{}, err
+	}
+
+	filename := filenameFromResponse(resp, parsed)
+	metadata, err := fileUploadMetadataFromPath(tempPath, filename, resp.Header.Get("Content-Type"), contentTypeOverride)
+	if err != nil {
+		cleanup()
+		return uploadSource{}, err
+	}
+
+	return uploadSource{
+		path:     tempPath,
+		metadata: metadata,
+		cleanup:  cleanup,
+	}, nil
+}
+
+func isHTTPURL(input string) bool {
+	u, err := url.Parse(input)
+	if err != nil {
+		return false
+	}
+	return u.Scheme == "http" || u.Scheme == "https"
+}
+
+func filenameFromResponse(resp *http.Response, parsed *url.URL) string {
+	if disposition := resp.Header.Get("Content-Disposition"); disposition != "" {
+		if _, params, err := mime.ParseMediaType(disposition); err == nil {
+			if filename := filepath.Base(params["filename"]); filename != "." && filename != string(filepath.Separator) && filename != "" {
+				return filename
+			}
+			if filename := filepath.Base(params["filename*"]); filename != "." && filename != string(filepath.Separator) && filename != "" {
+				return filename
+			}
+		}
+	}
+
+	if parsed != nil {
+		if filename := filepath.Base(parsed.EscapedPath()); filename != "." && filename != string(filepath.Separator) && filename != "" {
+			if unescaped, err := url.PathUnescape(filename); err == nil && unescaped != "" {
+				return unescaped
+			}
+			return filename
+		}
+	}
+
+	return "download"
+}
+
 func fileUploadMetadata(path, contentTypeOverride string) (uploadMetadata, error) {
+	return fileUploadMetadataFromPath(path, filepath.Base(path), "", contentTypeOverride)
+}
+
+func fileUploadMetadataFromPath(path, filename, contentTypeHint, contentTypeOverride string) (uploadMetadata, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return uploadMetadata{}, err
@@ -575,7 +702,10 @@ func fileUploadMetadata(path, contentTypeOverride string) (uploadMetadata, error
 
 	contentType := contentTypeOverride
 	if contentType == "" {
-		contentType = mime.TypeByExtension(filepath.Ext(path))
+		contentType = cleanContentType(contentTypeHint)
+	}
+	if contentType == "" {
+		contentType = cleanContentType(mime.TypeByExtension(filepath.Ext(filename)))
 	}
 	if contentType == "" {
 		contentType = http.DetectContentType(header[:n])
@@ -585,11 +715,22 @@ func fileUploadMetadata(path, contentTypeOverride string) (uploadMetadata, error
 	}
 
 	return uploadMetadata{
-		filename:    filepath.Base(path),
+		filename:    filename,
 		contentType: contentType,
 		byteSize:    info.Size(),
 		checksum:    base64.StdEncoding.EncodeToString(hash.Sum(nil)),
 	}, nil
+}
+
+func cleanContentType(contentType string) string {
+	if contentType == "" {
+		return ""
+	}
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return ""
+	}
+	return mediaType
 }
 
 func firstNonEmpty(values ...string) string {

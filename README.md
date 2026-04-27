@@ -1,6 +1,6 @@
 # pintomind-cli
 
-Command-line interface for the [Pintomind / Infoskjermen](https://infoskjermen.no) API. Control your screens, channels, resources, media, and themes from the terminal or from Claude Code skills.
+Command-line interface for the [Pintomind / Infoskjermen](https://infoskjermen.no) API. Control your screens, channels, resources, media, and themes from the terminal or from AI-agent skills.
 
 ## Installation
 
@@ -47,6 +47,7 @@ Or run them individually:
 
 ```bash
 pintomind setup claude       # install the Claude Code skill
+pintomind setup codex        # install the Codex / ChatGPT-compatible skill
 pintomind setup completion   # install shell tab-completion
 ```
 
@@ -277,6 +278,7 @@ pintomind media delete <id> --force
 
 ```bash
 pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"
+pintomind media upload <collection-id> https://example.com/photo.jpg --name "Lobby photo"
 pintomind media upload <collection-id> ./deck.pdf --extract-pages
 ```
 
@@ -388,9 +390,11 @@ pintomind schemas show text_slide
 
 ---
 
-## Claude Code skill
+## AI Agent Skills
 
-The skill is embedded in the binary. Install it with:
+The Pintomind skill is embedded in the binary.
+
+For Claude Code:
 
 ```bash
 pintomind setup claude
@@ -398,4 +402,12 @@ pintomind setup claude
 
 This writes `~/.claude/skills/pintomind/SKILL.md`, making `/pintomind` available as a slash command in any Claude Code session. Use `--force` to overwrite an existing installation.
 
-Once installed, Claude can interact with your screens on your behalf — listing screens, sending commands, switching channels, and more.
+For Codex and ChatGPT/OpenAI-compatible agents:
+
+```bash
+pintomind setup codex
+```
+
+This writes `SKILL.md` and `agents/openai.yaml` to `$CODEX_HOME/skills/pintomind`, or `~/.codex/skills/pintomind` when `CODEX_HOME` is unset. The command also works as `pintomind setup openai` or `pintomind setup chatgpt`.
+
+Once installed, agents can interact with your screens on your behalf — listing screens, sending commands, switching channels, uploading media, creating posts, and more.
