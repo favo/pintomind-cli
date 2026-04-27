@@ -154,3 +154,41 @@ func (c *Client) Post(path string, body any, out any) error {
 func (c *Client) Delete(path string) error {
 	return c.do("DELETE", path, nil, nil)
 }
+
+func (c *Client) PutDirectUpload(uploadURL string, headers map[string]string, body io.Reader, contentLength int64) error {
+	req, err := http.NewRequest("PUT", uploadURL, body)
+	if err != nil {
+		return err
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	if contentLength >= 0 {
+		req.ContentLength = contentLength
+	}
+
+	if c.Verbose {
+		fmt.Fprintf(debugWriter, "> PUT %s\n", uploadURL)
+	}
+
+	uploadClient := *c.HTTPClient
+	uploadClient.Timeout = 0
+	resp, err := uploadClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if c.Verbose {
+		fmt.Fprintf(debugWriter, "< %s\n", resp.Status)
+	}
+
+	if resp.StatusCode >= 400 {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if len(data) > 0 {
+			return fmt.Errorf("direct upload error %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
+		}
+		return fmt.Errorf("direct upload error %d", resp.StatusCode)
+	}
+	return nil
+}

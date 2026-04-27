@@ -42,11 +42,11 @@ func NewRootCmd() *cobra.Command {
 			client := api.New(domain.BaseURL, domain.APIKey)
 			client.Verbose = verbose
 			app := &appctx.App{
-				Config:       cfg,
-				Client:       client,
+				Config:        cfg,
+				Client:        client,
 				ActiveAccount: domainName,
-				JSONOutput:   jsonOutput,
-				Verbose:      verbose,
+				JSONOutput:    jsonOutput,
+				Verbose:       verbose,
 			}
 			cmd.SetContext(appctx.WithApp(cmd.Context(), app))
 			return nil
@@ -66,6 +66,8 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(commands.NewScreensCmd())
 	root.AddCommand(commands.NewChannelsCmd())
 	root.AddCommand(commands.NewResourcesCmd())
+	root.AddCommand(commands.NewMediaCollectionsCmd())
+	root.AddCommand(commands.NewMediaCmd())
 	root.AddCommand(commands.NewSchemasCmd())
 	root.AddCommand(commands.NewThemesCmd())
 

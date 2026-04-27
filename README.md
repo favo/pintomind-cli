@@ -1,6 +1,6 @@
 # pintomind-cli
 
-Command-line interface for the [Pintomind / Infoskjermen](https://infoskjermen.no) API. Control your screens, channels, resources, and themes from the terminal or from Claude Code skills.
+Command-line interface for the [Pintomind / Infoskjermen](https://infoskjermen.no) API. Control your screens, channels, resources, media, and themes from the terminal or from Claude Code skills.
 
 ## Installation
 
@@ -244,6 +244,46 @@ pintomind resources append <id> --items '[{"text":"New item"}]'
 ```bash
 pintomind resources delete <id>
 pintomind resources delete <id> --force  # Skip confirmation prompt
+```
+
+### Media Collections
+
+```bash
+pintomind media-collections list
+pintomind media-collections list --sort-by title
+pintomind media-collections list --page 2 --per-page 50
+pintomind media-collections show <id>
+pintomind media-collections create --title "Campaign photos" --category image
+pintomind media-collections update <id> --title "Updated title"
+pintomind media-collections delete <id>
+pintomind media-collections delete <id> --force
+```
+
+Categories are `background`, `logo`, `image`, `video`, and `document`.
+
+### Media
+
+```bash
+pintomind media list <collection-id>
+pintomind media list <collection-id> --sort-by created_at:desc
+pintomind media show <id>
+pintomind media update <id> --name "Lobby photo"
+pintomind media update <id> --collection-id <target-collection-id>
+pintomind media delete <id>
+pintomind media delete <id> --force
+```
+
+**Upload a file** (the CLI handles checksum, direct upload, and media creation):
+
+```bash
+pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"
+pintomind media upload <collection-id> ./deck.pdf --extract-pages
+```
+
+For advanced flows, claim an already-created direct upload signed ID:
+
+```bash
+pintomind media create <collection-id> --source <signed-id> --name "Uploaded file"
 ```
 
 ### Schemas
