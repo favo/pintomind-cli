@@ -288,6 +288,81 @@ For advanced flows, claim an already-created direct upload signed ID:
 pintomind media create <collection-id> --source <signed-id> --name "Uploaded file"
 ```
 
+### Poster Templates
+
+Poster templates are poster posts shared via the account's content networks that can be duplicated into new account-owned poster posts.
+
+```bash
+pintomind poster-templates list
+pintomind poster-templates list --sort-by name
+pintomind poster-templates show <id>   # includes raw_poster_data
+```
+
+### Poster Posts
+
+Poster posts are backed by a `PosterPageResource` that holds the design data.
+
+**Create from a network template:**
+
+```bash
+pintomind posts create --type poster --source-id <template-id> --data '{"name":"My Poster"}'
+```
+
+**Create from scratch:**
+
+```bash
+pintomind posts create --type poster --data '{
+  "name": "Lobby poster",
+  "resources": [{
+    "poster_data": "{\"backgroundFill\":\"#ffffff\",\"templateDimensions\":{},\"templates\":{},\"aspectRatio\":\"16/9\"}",
+    "color_palette_id": 123
+  }]
+}'
+```
+
+**Update poster content:**
+
+```bash
+pintomind posts update <post-id> --data '{"resources": [{"poster_data": "<json-string>"}]}'
+pintomind resources update <resource-id> --data '{"poster_data": "<json-string>"}'
+```
+
+### Media Boxes
+
+Media boxes attach content (images, icons, emojis, QR codes, GIFs, Unsplash photos) to nodes inside a poster template. Pass them inline on `resources[0]` or set them directly on the backing resource.
+
+```bash
+# Create poster with media boxes
+pintomind posts create --type poster --source-id <template-id> --data '{
+  "name": "Birthday poster",
+  "resources": [{
+    "media_boxes": {
+      "image": {
+        "0": {"position": "hero-image", "type": "media", "media_id": 42, "background_size": "cover"},
+        "1": {"position": "avatar",     "type": "emoji", "emoji": "🎂"}
+      }
+    }
+  }]
+}'
+
+# Update media boxes on the backing resource
+pintomind resources update <resource-id> --data '{
+  "media_boxes": {
+    "image": {
+      "0": {"position": "hero-image", "type": "media", "media_id": 42},
+      "1": {"position": "logo",       "type": "icon",  "icon_name": "user"}
+    }
+  }
+}'
+
+# Clear all media boxes
+pintomind resources update <resource-id> --data '{"media_boxes": {"image": {}}}'
+```
+
+The outer key is always `"image"`. Inner keys are sequential string integers (`"0"`, `"1"`, …). Each submission **fully replaces** the field.
+
+Media box types: `media` (requires `media_id`), `icon` (requires `icon_name`), `emoji` (requires `emoji`), `qr_code` (requires `url`), `gif` (requires `gif_id`, `gif_url`), `unsplash` (requires `photo_id`, `photo_url`).
+
 ### Schemas
 
 Inspect the API schema for resource types (useful for knowing which fields are valid in `--data`):

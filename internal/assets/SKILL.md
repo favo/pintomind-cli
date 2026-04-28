@@ -374,6 +374,66 @@ pintomind resources update <resource-id> --data '{"poster_data": "<json-string>"
 
 **Note:** `poster_page` resources are auto-created by poster posts. Do not create them manually via `resources create`.
 
+### Media Boxes
+
+Media boxes attach content (images, icons, emojis, QR codes, GIFs, Unsplash photos) to nodes inside a poster template. A node accepts a media box when its fills include a fill of type `"media"`. Use the node's `id` from the template as the `position` value.
+
+Pass `media_boxes` inline on `resources[0]` when creating or updating a poster post, or set them directly on the backing resource:
+
+```bash
+# Create poster with media boxes inline
+pintomind posts create --type poster --source-id <template-id> --data '{
+  "name": "Birthday poster",
+  "resources": [{
+    "media_boxes": {
+      "image": {
+        "0": {"position": "hero-image", "type": "media", "media_id": 42, "background_size": "cover"},
+        "1": {"position": "avatar", "type": "emoji", "emoji": "🎂"}
+      }
+    }
+  }]
+}'
+
+# Update media boxes on an existing poster (via post)
+pintomind posts update <post-id> --data '{
+  "resources": [{
+    "media_boxes": {
+      "image": {
+        "0": {"position": "hero-image", "type": "icon", "icon_name": "star"}
+      }
+    }
+  }]
+}'
+
+# Update media boxes directly on the backing resource
+pintomind resources update <resource-id> --data '{
+  "media_boxes": {
+    "image": {
+      "0": {"position": "hero-image", "type": "media", "media_id": 42},
+      "1": {"position": "logo",       "type": "icon",  "icon_name": "user"}
+    }
+  }
+}'
+
+# Clear all media boxes from a resource
+pintomind resources update <resource-id> --data '{"media_boxes": {"image": {}}}'
+```
+
+The outer key is always `"image"`. The inner keys are sequential string integers (`"0"`, `"1"`, …), one per node. Each submission **fully replaces** the field — positions not listed are removed.
+
+#### Media box types
+
+| Type | Required fields | Key optional fields |
+|---|---|---|
+| `media` | `media_id` (integer — ID from media library) | `background_size` (`"cover"`/`"contain"`, default `"cover"`), `x`, `y` (0–1 focal point, default `0.5`) |
+| `icon` | `icon_name` (string) | `icon_type`, `relative_size` (default `0.9`) |
+| `emoji` | `emoji` (Unicode character, e.g. `"🎂"`) | `relative_size` (default `0.9`) |
+| `qr_code` | `url` (string) | `relative_size` (default `0.9`) |
+| `gif` | `gif_id`, `gif_url` | `background_size`, `x`, `y`, `gif_source`, `preview_url` |
+| `unsplash` | `photo_id`, `photo_url` | `background_size` (default `"cover"`), `x`, `y`, `author_name`, `author_url` |
+
+Both the alias (`"media"`) and class name (`"ImageMediaBox"`) are accepted as `type` on input. Responses always use the alias.
+
 ## Themes
 
 ```bash
