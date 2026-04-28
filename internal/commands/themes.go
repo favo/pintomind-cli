@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -21,11 +22,14 @@ type ThemesResponse struct {
 func NewThemesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "themes",
-		Short: "List and inspect themes",
+		Short: "Manage themes",
 	}
 	cmd.AddCommand(newThemesListCmd())
 	cmd.AddCommand(newThemesShowCmd())
 	cmd.AddCommand(newThemesStatsCmd())
+	cmd.AddCommand(newThemesCreateCmd())
+	cmd.AddCommand(newThemesUpdateCmd())
+	cmd.AddCommand(newThemesDeleteCmd())
 	return cmd
 }
 
@@ -98,4 +102,93 @@ func newThemesStatsCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newThemesCreateCmd() *cobra.Command {
+	var themeType string
+	var data string
+
+	cmd := &cobra.Command{
+		Use:   "create --data '<json>'",
+		Short: "Create a theme",
+		Example: `  pintomind themes create --data '{"name":"My theme","font_family_header_id":1,"font_family_body_id":2,"color_palette_id":3}'`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			var theme map[string]any
+			if err := json.Unmarshal([]byte(data), &theme); err != nil {
+				return fmt.Errorf("invalid JSON for --data: %w", err)
+			}
+			body := map[string]any{"theme": theme}
+			if themeType != "" {
+				body["type"] = themeType
+			}
+			var resp map[string]any
+			if err := a.Client.Post("/themes", body, &resp); err != nil {
+				return err
+			}
+			printJSON(resp)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&themeType, "type", "", "Theme type alias (default: modern)")
+	cmd.Flags().StringVar(&data, "data", "", "Theme attributes as JSON (required)")
+	_ = cmd.MarkFlagRequired("data")
+	return cmd
+}
+
+func newThemesUpdateCmd() *cobra.Command {
+	var data string
+
+	cmd := &cobra.Command{
+		Use:   "update <id> --data '<json>'",
+		Short: "Update a theme",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			var theme map[string]any
+			if err := json.Unmarshal([]byte(data), &theme); err != nil {
+				return fmt.Errorf("invalid JSON for --data: %w", err)
+			}
+			body := map[string]any{"theme": theme}
+			var resp map[string]any
+			if err := a.Client.Patch("/themes/"+args[0], body, &resp); err != nil {
+				return err
+			}
+			printJSON(resp)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&data, "data", "", "Theme attributes as JSON (required)")
+	_ = cmd.MarkFlagRequired("data")
+	return cmd
+}
+
+func newThemesDeleteCmd() *cobra.Command {
+	var force bool
+
+	cmd := &cobra.Command{
+		Use:   "delete <id>",
+		Short: "Delete a theme (hard-delete; affected channels are reset to the account's standard theme)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			if !force {
+				fmt.Printf("Delete theme %s? Channels using it will be reset to the standard theme. Pass --force to skip this prompt.\n", args[0])
+				var confirm string
+				fmt.Print("Type 'yes' to confirm: ")
+				fmt.Scanln(&confirm)
+				if confirm != "yes" {
+					fmt.Println("Aborted.")
+					return nil
+				}
+			}
+			if err := a.Client.Delete("/themes/" + args[0]); err != nil {
+				return err
+			}
+			fmt.Printf("Deleted theme %s\n", args[0])
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
+	return cmd
 }

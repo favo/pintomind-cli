@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -153,6 +156,91 @@ func (c *Client) Post(path string, body any, out any) error {
 
 func (c *Client) Delete(path string) error {
 	return c.do("DELETE", path, nil, nil)
+}
+
+// PostMultipart sends a multipart/form-data POST. fields are plain form values;
+// files maps form field name → local file path.
+func (c *Client) PostMultipart(path string, fields map[string]string, files map[string]string, out any) error {
+	return c.doMultipart("POST", path, fields, files, out)
+}
+
+// PatchMultipart sends a multipart/form-data PATCH.
+func (c *Client) PatchMultipart(path string, fields map[string]string, files map[string]string, out any) error {
+	return c.doMultipart("PATCH", path, fields, files, out)
+}
+
+func (c *Client) doMultipart(method, path string, fields map[string]string, files map[string]string, out any) error {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+
+	for key, value := range fields {
+		if err := w.WriteField(key, value); err != nil {
+			return err
+		}
+	}
+	for fieldName, filePath := range files {
+		f, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("opening %s: %w", filePath, err)
+		}
+		defer f.Close() //nolint:gocritic
+		fw, err := w.CreateFormFile(fieldName, filepath.Base(filePath))
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(fw, f); err != nil {
+			return err
+		}
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+
+	u := c.BaseURL + "/api/v1" + path
+	req, err := http.NewRequest(method, u, &buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	if c.Verbose {
+		fmt.Fprintf(debugWriter, "> %s %s (multipart)\n", method, u)
+	}
+
+	uploadClient := *c.HTTPClient
+	uploadClient.Timeout = 60 * time.Second
+	resp, err := uploadClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if c.Verbose {
+		fmt.Fprintf(debugWriter, "< %s\n", resp.Status)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		var errBody struct {
+			Error string `json:"error"`
+		}
+		_ = json.Unmarshal(data, &errBody)
+		if errBody.Error != "" {
+			return fmt.Errorf("API error %d: %s", resp.StatusCode, errBody.Error)
+		}
+		return fmt.Errorf("API error %d", resp.StatusCode)
+	}
+	if out != nil {
+		if err := json.Unmarshal(data, out); err != nil {
+			return fmt.Errorf("decoding response: %w", err)
+		}
+	}
+	return nil
 }
 
 func (c *Client) PutDirectUpload(uploadURL string, headers map[string]string, body io.Reader, contentLength int64) error {
