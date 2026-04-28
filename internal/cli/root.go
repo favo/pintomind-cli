@@ -71,6 +71,8 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(commands.NewPostsCmd())
 	root.AddCommand(commands.NewSchemasCmd())
 	root.AddCommand(commands.NewThemesCmd())
+	root.AddCommand(commands.NewColorPalettesCmd())
+	root.AddCommand(commands.NewFontFamiliesCmd())
 
 	root.InitDefaultCompletionCmd()
 

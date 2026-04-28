@@ -1,9 +1,9 @@
 ---
 name: pintomind
-description: Interact with Pintomind / Infoskjermen screens, channels, resources, media, and themes via the pintomind CLI. Use for ANY Pintomind question or action.
+description: Interact with Pintomind / Infoskjermen screens, channels, resources, media, themes, color palettes, and font families via the pintomind CLI. Use for ANY Pintomind question or action.
 ---
 
-You are an expert at using the `pintomind` CLI to interact with the Pintomind / Infoskjermen API.
+You are an expert at using the `pintomind` CLI to interact with the Pintomind / Infoskjermen API. You help users manage screens, channels, resources, media, posts, themes, color palettes, and font families.
 
 ## Setup
 
@@ -287,10 +287,77 @@ pintomind posts publish <post-id> <channel-id>
 
 ```bash
 pintomind themes list
-pintomind themes list --page 2
+pintomind themes list --sort-by name
+pintomind themes list --page 2 --per-page 50
 pintomind themes show <id>
 pintomind themes stats
+pintomind themes create --data '{"name":"My theme","font_family_header_id":1,"font_family_body_id":2}'
+pintomind themes create --data '{"name":"Brand theme","font_family_header_id":1,"font_family_body_id":2,"color_palette_id":3}'
+pintomind themes create --type modern --data '{"name":"Modern","font_family_header_id":1,"font_family_body_id":2,"variation":"clean"}'
+pintomind themes update <id> --data '{"name":"Updated name"}'
+pintomind themes update <id> --data '{"color_palette_id":5}'
+pintomind themes delete <id>
+pintomind themes delete <id> --force
 ```
+
+Required fields for `create`: `name`, `font_family_header_id`, `font_family_body_id`.
+Optional: `color_palette_id`, `variation`, `areas`, and any flat layout/background/text properties.
+Deleting a theme resets channels using it to the account's standard theme.
+
+## Color Palettes
+
+```bash
+pintomind color-palettes list
+pintomind color-palettes list --sort-by name
+pintomind color-palettes list --page 2 --per-page 50
+pintomind color-palettes show <id>
+pintomind color-palettes stats
+pintomind color-palettes create --name "Brand" --primary-color "#1F8A8A"
+pintomind color-palettes create --name "Brand" --primary-color "#1F8A8A" --secondary-color "#F5A623" --tertiary-color "#2C3E50"
+pintomind color-palettes update <id> --name "Updated name"
+pintomind color-palettes update <id> --primary-color "#FF0000"
+pintomind color-palettes delete <id>
+pintomind color-palettes delete <id> --force
+```
+
+Color values must be hex (e.g. `#1F8A8A`). The API auto-generates the full 12-step color ramps from the base colors.
+Deleting a palette repoints themes using it to another available palette; returns an error if none exists.
+Palettes shared with network members cannot be deleted.
+
+## Font Families
+
+```bash
+pintomind font-families list
+pintomind font-families list --type remote_css
+pintomind font-families list --type remote_css,uploaded,standard
+pintomind font-families list --sort-by name
+pintomind font-families show <id>
+pintomind font-families stats
+
+# Remote CSS font (e.g. Google Fonts)
+pintomind font-families create --type remote_css --name "Inter" \
+  --url "https://fonts.googleapis.com/css2?family=Inter:wght@400;700"
+
+# Uploaded font — signed_ids from 'pintomind media upload' / direct_uploads
+pintomind font-families create --type uploaded --name "MyFont" \
+  --font-normal <signed_id> --font-bold <signed_id>
+pintomind font-families create --type uploaded --name "MyFont" \
+  --font-normal <signed_id> --font-bold <signed_id> \
+  --font-italic <signed_id> --font-bold-italic <signed_id>
+
+pintomind font-families update <id> --name "Renamed"
+pintomind font-families update <id> --suitable-for-body
+pintomind font-families delete <id>
+pintomind font-families delete <id> --force
+```
+
+Font types:
+- `remote_css` — references a hosted CSS file. Required: `--url`. Optional: `--font-name` (picked from CSS if omitted).
+- `uploaded` — attaches `.ttf`/`.otf`/`.woff`/`.woff2` files via `signed_id`s from `POST /api/v1/direct_uploads`. Required: `--font-normal`, `--font-bold`. Optional: `--font-italic`, `--font-bold-italic`.
+- `standard` — system fonts, read-only (cannot be created or deleted).
+
+Deleting a font resets themes using it to the system default (`figtree`).
+Fonts shared with network members cannot be deleted.
 
 ## Identity
 
@@ -316,6 +383,9 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Reload all screens at once: `pintomind screens reload --all`
 - Wait for a screen after reboot: `pintomind screens reboot 42 && pintomind screens wait-online 42`
 - Apply a theme to every channel: `pintomind channels set-theme --all <theme-id>`
+- List all color palettes: `pintomind color-palettes list --json | jq '.items[] | {id, name, primary_color}'`
+- Create a palette and use it in a theme: `pintomind color-palettes create --name "Brand" --primary-color "#1F8A8A"` then `pintomind themes update <theme-id> --data '{"color_palette_id":<id>}'`
+- Add a Google Font: `pintomind font-families create --type remote_css --name "Inter" --url "https://fonts.googleapis.com/css2?family=Inter:wght@400;700"`
 - Upload a file to media: `pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"`
 - Inspect valid resource fields: `pintomind schemas show text`
 - Inspect valid post fields: `pintomind schemas show post_image` (prefix `post_`)
