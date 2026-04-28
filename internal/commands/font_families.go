@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+
 type FontFamily struct {
 	ID   int    `json:"id"`
 	Type string `json:"type"`
@@ -121,64 +122,77 @@ func newFontFamiliesCreateCmd() *cobra.Command {
 		Example: `  # Remote CSS (e.g. Google Fonts)
   pintomind font-families create --type remote_css --name "Inter" --url "https://fonts.googleapis.com/css2?family=Inter"
 
-  # Uploaded font (signed_ids from 'pintomind media upload' / direct_uploads)
-  pintomind font-families create --type uploaded --name "MyFont" --font-normal <signed_id> --font-bold <signed_id>`,
+  # Upload font files (.ttf/.otf/.woff/.woff2)
+  pintomind font-families create --type uploaded --name "MyFont" --font-normal ./MyFont-Regular.ttf --font-bold ./MyFont-Bold.ttf`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
-			fontFamily := map[string]any{"name": name}
 
 			switch fontType {
 			case "remote_css":
 				if fontURL == "" {
 					return fmt.Errorf("--url is required for remote_css fonts")
 				}
-				fontFamily["url"] = fontURL
+				fontFamily := map[string]any{"name": name, "url": fontURL}
 				if fontName != "" {
 					fontFamily["font_name"] = fontName
 				}
+				if cmd.Flags().Changed("suitable-for-body") {
+					fontFamily["suitable_for_body"] = suitableForBody
+				}
+				if cmd.Flags().Changed("force-text-transform") {
+					fontFamily["force_text_transform"] = forceTextTransform
+				}
+				var resp map[string]any
+				if err := a.Client.Post("/font_families", map[string]any{"type": fontType, "font_family": fontFamily}, &resp); err != nil {
+					return err
+				}
+				printJSON(resp)
+				return nil
+
 			case "uploaded":
 				if fontNormal == "" || fontBold == "" {
 					return fmt.Errorf("--font-normal and --font-bold are required for uploaded fonts")
 				}
-				fontFamily["font_normal"] = fontNormal
-				fontFamily["font_bold"] = fontBold
+				fields := map[string]string{
+					"type":                   fontType,
+					"font_family[name]":      name,
+				}
+				if cmd.Flags().Changed("suitable-for-body") {
+					fields["font_family[suitable_for_body]"] = fmt.Sprintf("%v", suitableForBody)
+				}
+				if cmd.Flags().Changed("force-text-transform") {
+					fields["font_family[force_text_transform]"] = fmt.Sprintf("%v", forceTextTransform)
+				}
+				files := map[string]string{
+					"font_family[font_normal]": fontNormal,
+					"font_family[font_bold]":   fontBold,
+				}
 				if fontItalic != "" {
-					fontFamily["font_italic"] = fontItalic
+					files["font_family[font_italic]"] = fontItalic
 				}
 				if fontBoldItalic != "" {
-					fontFamily["font_bold_italic"] = fontBoldItalic
+					files["font_family[font_bold_italic]"] = fontBoldItalic
 				}
+				var resp map[string]any
+				if err := a.Client.PostMultipart("/font_families", fields, files, &resp); err != nil {
+					return err
+				}
+				printJSON(resp)
+				return nil
+
 			default:
 				return fmt.Errorf("--type must be remote_css or uploaded")
 			}
-
-			if cmd.Flags().Changed("suitable-for-body") {
-				fontFamily["suitable_for_body"] = suitableForBody
-			}
-			if cmd.Flags().Changed("force-text-transform") {
-				fontFamily["force_text_transform"] = forceTextTransform
-			}
-
-			body := map[string]any{
-				"type":        fontType,
-				"font_family": fontFamily,
-			}
-			var resp map[string]any
-			if err := a.Client.Post("/font_families", body, &resp); err != nil {
-				return err
-			}
-			printJSON(resp)
-			return nil
 		},
 	}
 	cmd.Flags().StringVar(&fontType, "type", "", "Font type: remote_css or uploaded (required)")
 	cmd.Flags().StringVar(&name, "name", "", "Font family name (required)")
 	cmd.Flags().StringVar(&fontURL, "url", "", "Hosted CSS URL (remote_css only, e.g. Google Fonts URL)")
 	cmd.Flags().StringVar(&fontName, "font-name", "", "CSS font-family name override (remote_css only; picked from CSS if omitted)")
-	cmd.Flags().StringVar(&fontNormal, "font-normal", "", "signed_id for normal weight font file (uploaded only, required)")
-	cmd.Flags().StringVar(&fontBold, "font-bold", "", "signed_id for bold weight font file (uploaded only, required)")
-	cmd.Flags().StringVar(&fontItalic, "font-italic", "", "signed_id for italic font file (uploaded only, optional)")
-	cmd.Flags().StringVar(&fontBoldItalic, "font-bold-italic", "", "signed_id for bold-italic font file (uploaded only, optional)")
+	cmd.Flags().StringVar(&fontNormal, "font-normal", "", "Path to normal weight font file (uploaded only, required; .ttf/.otf/.woff/.woff2)")
+	cmd.Flags().StringVar(&fontBold, "font-bold", "", "Path to bold weight font file (uploaded only, required)")
+	cmd.Flags().StringVar(&fontItalic, "font-italic", "", "Path to italic font file (uploaded only, optional)")
+	cmd.Flags().StringVar(&fontBoldItalic, "font-bold-italic", "", "Path to bold-italic font file (uploaded only, optional)")
 	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Mark font as suitable for body text")
 	cmd.Flags().BoolVar(&forceTextTransform, "force-text-transform", false, "Force text transform")
 	_ = cmd.MarkFlagRequired("type")
@@ -197,6 +211,49 @@ func newFontFamiliesUpdateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
+
+			hasFiles := cmd.Flags().Changed("font-normal") ||
+				cmd.Flags().Changed("font-bold") ||
+				cmd.Flags().Changed("font-italic") ||
+				cmd.Flags().Changed("font-bold-italic")
+
+			if hasFiles {
+				// Use multipart when uploading font files
+				fields := map[string]string{}
+				files := map[string]string{}
+				if cmd.Flags().Changed("name") {
+					fields["font_family[name]"] = name
+				}
+				if cmd.Flags().Changed("suitable-for-body") {
+					fields["font_family[suitable_for_body]"] = fmt.Sprintf("%v", suitableForBody)
+				}
+				if cmd.Flags().Changed("force-text-transform") {
+					fields["font_family[force_text_transform]"] = fmt.Sprintf("%v", forceTextTransform)
+				}
+				if fontNormal != "" {
+					files["font_family[font_normal]"] = fontNormal
+				}
+				if fontBold != "" {
+					files["font_family[font_bold]"] = fontBold
+				}
+				if fontItalic != "" {
+					files["font_family[font_italic]"] = fontItalic
+				}
+				if fontBoldItalic != "" {
+					files["font_family[font_bold_italic]"] = fontBoldItalic
+				}
+				if len(fields)+len(files) == 0 {
+					return fmt.Errorf("provide at least one field to update")
+				}
+				var resp map[string]any
+				if err := a.Client.PatchMultipart("/font_families/"+args[0], fields, files, &resp); err != nil {
+					return err
+				}
+				printJSON(resp)
+				return nil
+			}
+
+			// No files — use JSON (works for both remote_css and name-only updates)
 			fontFamily := map[string]any{}
 			if cmd.Flags().Changed("name") {
 				fontFamily["name"] = name
@@ -206,18 +263,6 @@ func newFontFamiliesUpdateCmd() *cobra.Command {
 			}
 			if cmd.Flags().Changed("font-name") {
 				fontFamily["font_name"] = fontName
-			}
-			if cmd.Flags().Changed("font-normal") {
-				fontFamily["font_normal"] = fontNormal
-			}
-			if cmd.Flags().Changed("font-bold") {
-				fontFamily["font_bold"] = fontBold
-			}
-			if cmd.Flags().Changed("font-italic") {
-				fontFamily["font_italic"] = fontItalic
-			}
-			if cmd.Flags().Changed("font-bold-italic") {
-				fontFamily["font_bold_italic"] = fontBoldItalic
 			}
 			if cmd.Flags().Changed("suitable-for-body") {
 				fontFamily["suitable_for_body"] = suitableForBody
@@ -239,10 +284,10 @@ func newFontFamiliesUpdateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Font family name")
 	cmd.Flags().StringVar(&fontURL, "url", "", "Hosted CSS URL (remote_css only)")
 	cmd.Flags().StringVar(&fontName, "font-name", "", "CSS font-family name override (remote_css only)")
-	cmd.Flags().StringVar(&fontNormal, "font-normal", "", "signed_id for normal weight font file (uploaded only)")
-	cmd.Flags().StringVar(&fontBold, "font-bold", "", "signed_id for bold weight font file (uploaded only)")
-	cmd.Flags().StringVar(&fontItalic, "font-italic", "", "signed_id for italic font file (uploaded only)")
-	cmd.Flags().StringVar(&fontBoldItalic, "font-bold-italic", "", "signed_id for bold-italic font file (uploaded only)")
+	cmd.Flags().StringVar(&fontNormal, "font-normal", "", "Path to normal weight font file (uploaded only; .ttf/.otf/.woff/.woff2)")
+	cmd.Flags().StringVar(&fontBold, "font-bold", "", "Path to bold weight font file (uploaded only)")
+	cmd.Flags().StringVar(&fontItalic, "font-italic", "", "Path to italic font file (uploaded only)")
+	cmd.Flags().StringVar(&fontBoldItalic, "font-bold-italic", "", "Path to bold-italic font file (uploaded only)")
 	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Mark font as suitable for body text")
 	cmd.Flags().BoolVar(&forceTextTransform, "force-text-transform", false, "Force text transform")
 	return cmd
