@@ -107,8 +107,7 @@ func newMembersInviteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "invite --email <email> --role <role>",
 		Short: "Invite a user to the account",
-		Example: `  pintomind members invite --email carol@example.com --role editor
-  pintomind members invite --email carol@example.com --role admin --firstname Carol --lastname Christensen`,
+		Example: `  pintomind members invite --email carol@example.com --role editor --firstname Carol --lastname Christensen`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			body := map[string]any{
@@ -133,10 +132,12 @@ func newMembersInviteCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&email, "email", "", "Email address of the user to invite (required)")
 	cmd.Flags().StringVar(&role, "role", "", "Role to assign: account_owner, admin, editor (required)")
-	cmd.Flags().StringVar(&firstname, "firstname", "", "First name (used when creating a new user)")
-	cmd.Flags().StringVar(&lastname, "lastname", "", "Last name (used when creating a new user)")
+	cmd.Flags().StringVar(&firstname, "firstname", "", "First name of the user (required)")
+	cmd.Flags().StringVar(&lastname, "lastname", "", "Last name of the user (required)")
 	_ = cmd.MarkFlagRequired("email")
 	_ = cmd.MarkFlagRequired("role")
+	_ = cmd.MarkFlagRequired("firstname")
+	_ = cmd.MarkFlagRequired("lastname")
 	return cmd
 }
 
