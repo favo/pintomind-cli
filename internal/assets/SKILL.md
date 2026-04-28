@@ -133,9 +133,9 @@ pintomind schemas show post_<alias>   # e.g. pintomind schemas show post_image
 pintomind schemas show grid_templates # named grid layouts for plain post variations
 ```
 
-Resource schema keys: `calendar`, `calendar_events`, `entur`, `external_image`, `external_webpage`, `feed`, `feed_items`, `html`, `location`, `qr_code`, `text`, `youtube`.
+Resource schema keys: `calendar`, `calendar_events`, `entur`, `external_image`, `external_webpage`, `feed`, `feed_items`, `html`, `location`, `qr_code`, `text`, `youtube`, `poster_page`.
 
-Post schema keys: `post_plain`, `post_image`, `post_video`, `post_youtube`, `post_iframe`, `post_calendar`, `post_clock`, `post_world_clock`, `post_counter`, `post_forecast`, `post_feed`, `post_entur`, `post_power_price`.
+Post schema keys: `post_plain`, `post_image`, `post_video`, `post_youtube`, `post_iframe`, `post_calendar`, `post_clock`, `post_world_clock`, `post_counter`, `post_forecast`, `post_feed`, `post_entur`, `post_power_price`, `post_poster`.
 
 Reference keys: `grid_templates` — catalog of named grid layouts used by `post_plain` variation.
 
@@ -246,6 +246,19 @@ pintomind posts create --type calendar --data '{
   "limit_days":1,
   "show_location":true
 }'
+
+# Poster from a network template (see poster-templates section)
+pintomind posts create --type poster --source-id <template-id> --data '{"name":"My Poster"}'
+
+# Poster from scratch
+pintomind posts create --type poster --data '{
+  "name":"Lobby poster",
+  "resources":[{
+    "title":"Lobby poster",
+    "poster_data":"{\"backgroundFill\":\"#ffffff\",\"templateDimensions\":{},\"templates\":{},\"aspectRatio\":\"16/9\"}",
+    "color_palette_id":123
+  }]
+}'
 ```
 
 ### Updating posts
@@ -282,6 +295,84 @@ pintomind posts create --type image --data '{"name":"Lobby","media_resources":[{
 # 3. Publish it to a channel
 pintomind posts publish <post-id> <channel-id>
 ```
+
+## Poster Templates
+
+Poster templates are poster posts shared via the account's content networks that can be duplicated into new account-owned poster posts.
+
+```bash
+pintomind poster-templates list
+pintomind poster-templates list --sort-by name
+pintomind poster-templates list --page 2 --per-page 50
+pintomind poster-templates show <id>   # includes raw_poster_data
+```
+
+Fields per template: `id`, `name`, `aspect_ratios`, `resource_id`, `raw_poster_data`.
+
+- `aspect_ratios`: array of supported aspect ratio strings (e.g. `["16/9","9/16"]`)
+- `resource_id`: ID of the backing `PosterPageResource`
+- `raw_poster_data`: JSON string for use as `resource.poster_data` when updating a poster resource
+
+## Poster Posts
+
+Poster posts are backed by a `PosterPageResource` (type alias `poster_page`) that holds the design data.
+
+### Creating a poster from a network template
+
+```bash
+# 1. List available templates
+pintomind poster-templates list --json
+
+# 2. Duplicate a template into a new post owned by the account
+pintomind posts create --type poster --source-id <template-id> --data '{"name":"My Poster"}'
+
+# 3. Update the poster content via inline resources
+pintomind posts update <post-id> --data '{
+  "resources": [{"poster_data": "{\"backgroundFill\":\"#fff\",\"aspectRatio\":\"16/9\",\"templates\":{},\"templateDimensions\":{}}"}]
+}'
+
+# 4. Or update the backing resource directly
+pintomind resources update <resource-id> --data '{"poster_data": "{\"backgroundFill\":\"#fff\",\"aspectRatio\":\"16/9\"}"}'
+
+# 5. Publish to a channel
+pintomind posts publish <post-id> <channel-id>
+```
+
+### Creating a poster from scratch
+
+```bash
+pintomind posts create --type poster --data '{
+  "name": "Lobby poster",
+  "resources": [{
+    "title": "Lobby poster",
+    "poster_data": "{\"backgroundFill\":\"#ffffff\",\"templateDimensions\":{},\"templates\":{},\"aspectRatio\":\"16/9\",\"metaDescription\":\"Minimalist poster.\"}",
+    "color_palette_id": 123
+  }]
+}'
+```
+
+### Updating poster content
+
+When patching, include `resources[0].id` to update the existing backing resource explicitly. If `id` is omitted the API updates the existing resource automatically (or creates one if the post has none).
+
+```bash
+# Update via post — without id (auto-targets existing resource)
+pintomind posts update <post-id> --data '{
+  "resources": [{"poster_data": "<json-string>", "color_palette_id": 5}]
+}'
+
+# Update via post — explicit resource id
+pintomind posts update <post-id> --data '{
+  "resources": [{"id": <resource-id>, "poster_data": "<json-string>"}]
+}'
+
+# Update directly on the resource
+pintomind resources update <resource-id> --data '{"poster_data": "<json-string>"}'
+```
+
+`poster_data` is a JSON string with top-level keys: `backgroundFill`, `templateDimensions`, `templates`, `aspectRatio`, `metaDescription`.
+
+**Note:** `poster_page` resources are auto-created by poster posts. Do not create them manually via `resources create`.
 
 ## Themes
 

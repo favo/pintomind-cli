@@ -69,6 +69,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(commands.NewMediaCollectionsCmd())
 	root.AddCommand(commands.NewMediaCmd())
 	root.AddCommand(commands.NewPostsCmd())
+	root.AddCommand(commands.NewPosterTemplatesCmd())
 	root.AddCommand(commands.NewSchemasCmd())
 	root.AddCommand(commands.NewThemesCmd())
 	root.AddCommand(commands.NewColorPalettesCmd())

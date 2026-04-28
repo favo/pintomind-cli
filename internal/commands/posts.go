@@ -128,22 +128,26 @@ func newPostsShowCmd() *cobra.Command {
 }
 
 func newPostsCreateCmd() *cobra.Command {
-	var postType, data string
+	var postType, data, sourceID string
 
 	cmd := &cobra.Command{
 		Use:   "create --type <type> --data '<json>'",
 		Short: "Create a post",
-		Example: `  pintomind posts create --type image --data '{"name":"Spring","title":"New collection","duration_per_item":7,"resource_ids":[42,43],"options":{"aspect_ratio":"fill"}}'
-  pintomind posts create --type plain --data '{"title":"Hello","content":"World"}'`,
+		Example: `  pintomind posts create --type image --data '{"name":"Spring","title":"New collection","duration_per_item":7,"media_resources":[{"media_id":42}]}'
+  pintomind posts create --type plain --data '{"title":"Hello","content":"World"}'
+  pintomind posts create --type poster --source-id <template-id> --data '{"name":"My poster"}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
-			var post map[string]any
-			if err := json.Unmarshal([]byte(data), &post); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			body := map[string]any{"type": postType}
+			if data != "" {
+				var post map[string]any
+				if err := json.Unmarshal([]byte(data), &post); err != nil {
+					return fmt.Errorf("invalid JSON for --data: %w", err)
+				}
+				body["post"] = post
 			}
-			body := map[string]any{
-				"type": postType,
-				"post": post,
+			if sourceID != "" {
+				body["source_id"] = sourceID
 			}
 			var resp map[string]any
 			if err := a.Client.Post("/posts", body, &resp); err != nil {
@@ -154,9 +158,9 @@ func newPostsCreateCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&postType, "type", "", "Post type alias (required)")
-	cmd.Flags().StringVar(&data, "data", "", "Post fields as JSON (required)")
+	cmd.Flags().StringVar(&data, "data", "", "Post fields as JSON")
+	cmd.Flags().StringVar(&sourceID, "source-id", "", "Duplicate a network poster template (poster type only)")
 	_ = cmd.MarkFlagRequired("type")
-	_ = cmd.MarkFlagRequired("data")
 	return cmd
 }
 
