@@ -41,17 +41,12 @@ func NewMembersCmd() *cobra.Command {
 }
 
 func newMembersListCmd() *cobra.Command {
-	var status string
-
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List account members",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			q := url.Values{}
-			if status != "" {
-				q.Set("status", status)
-			}
 			applyPagination(cmd, q)
 
 			var resp MembersResponse
@@ -79,7 +74,6 @@ func newMembersListCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&status, "status", "", "Filter by status (accepted, pending, declined)")
 	addPaginationFlags(cmd)
 	return cmd
 }
@@ -125,7 +119,8 @@ func newMembersInviteCmd() *cobra.Command {
 			if a.JSONOutput {
 				printJSON(resp)
 			} else {
-				fmt.Printf("Invited %s as %s (status: %v)\n", email, role, resp["status"])
+				status, _ := resp["status"].(string)
+				fmt.Printf("Invited %s as %s (status: %s)\n", email, role, status)
 			}
 			return nil
 		},
