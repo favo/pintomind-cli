@@ -51,17 +51,15 @@ func newSetupCompletionCmd(root *cobra.Command) *cobra.Command {
 }
 
 func newSetupAllCmd(root *cobra.Command) *cobra.Command {
-	var force bool
-
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "all",
 		Short: "Run all setup steps (Claude/Codex skills + shell completion)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := installClaudeSkill(force); err != nil {
+			if err := installClaudeSkill(); err != nil {
 				return err
 			}
 			fmt.Println()
-			if err := installCodexSkill(force); err != nil {
+			if err := installCodexSkill(); err != nil {
 				return err
 			}
 			fmt.Println()
@@ -86,14 +84,10 @@ func newSetupAllCmd(root *cobra.Command) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "Overwrite installed skills if present")
-	return cmd
 }
 
 func newSetupClaudeCmd() *cobra.Command {
-	var force bool
-
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "claude",
 		Short: "Install the pintomind skill for Claude Code",
 		Long: `Installs the pintomind skill file to ~/.claude/skills/pintomind/SKILL.md.
@@ -101,7 +95,7 @@ func newSetupClaudeCmd() *cobra.Command {
 Once installed, Claude Code can use the /pintomind slash command to interact
 with your screens on your behalf from any project.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := installClaudeSkill(force); err != nil {
+			if err := installClaudeSkill(); err != nil {
 				return err
 			}
 			fmt.Println()
@@ -109,14 +103,10 @@ with your screens on your behalf from any project.`,
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "Overwrite if already installed")
-	return cmd
 }
 
 func newSetupCodexCmd() *cobra.Command {
-	var force bool
-
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:     "codex",
 		Aliases: []string{"openai", "chatgpt"},
 		Short:   "Install the pintomind skill for Codex and ChatGPT/OpenAI agents",
@@ -126,7 +116,7 @@ func newSetupCodexCmd() *cobra.Command {
 The install includes SKILL.md plus agents/openai.yaml metadata for OpenAI
 skill UIs such as Codex and ChatGPT-compatible agents.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := installCodexSkill(force); err != nil {
+			if err := installCodexSkill(); err != nil {
 				return err
 			}
 			fmt.Println()
@@ -134,11 +124,9 @@ skill UIs such as Codex and ChatGPT-compatible agents.`,
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "Overwrite if already installed")
-	return cmd
 }
 
-func installClaudeSkill(force bool) error {
+func installClaudeSkill() error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("finding home directory: %w", err)
@@ -147,8 +135,7 @@ func installClaudeSkill(force bool) error {
 	skillDir := filepath.Join(home, ".claude", "skills", "pintomind")
 	dest := filepath.Join(skillDir, "SKILL.md")
 
-	wrote, err := writeSkillFile(dest, assets.PintomindSkill, force)
-	if err != nil {
+	if err := writeSkillFile(dest, assets.PintomindSkill); err != nil {
 		return fmt.Errorf("installing Claude skill: %w", err)
 	}
 
@@ -157,16 +144,11 @@ func installClaudeSkill(force bool) error {
 		_ = os.Remove(stale)
 	}
 
-	if wrote {
-		fmt.Printf("Installed Claude skill to %s\n", dest)
-	} else {
-		fmt.Printf("Claude skill already installed at %s\n", dest)
-		fmt.Println("Use --force to overwrite.")
-	}
+	fmt.Printf("Installed Claude skill to %s\n", dest)
 	return nil
 }
 
-func installCodexSkill(force bool) error {
+func installCodexSkill() error {
 	root, err := codexHome()
 	if err != nil {
 		return err
@@ -176,21 +158,14 @@ func installCodexSkill(force bool) error {
 	skillDest := filepath.Join(skillDir, "SKILL.md")
 	metadataDest := filepath.Join(skillDir, "agents", "openai.yaml")
 
-	wroteSkill, err := writeSkillFile(skillDest, assets.PintomindSkill, force)
-	if err != nil {
+	if err := writeSkillFile(skillDest, assets.PintomindSkill); err != nil {
 		return fmt.Errorf("installing Codex skill: %w", err)
 	}
-	wroteMetadata, err := writeSkillFile(metadataDest, assets.OpenAIMetadata, force)
-	if err != nil {
+	if err := writeSkillFile(metadataDest, assets.OpenAIMetadata); err != nil {
 		return fmt.Errorf("installing OpenAI skill metadata: %w", err)
 	}
 
-	if wroteSkill || wroteMetadata {
-		fmt.Printf("Installed Codex/OpenAI skill to %s\n", skillDir)
-	} else {
-		fmt.Printf("Codex/OpenAI skill already installed at %s\n", skillDir)
-		fmt.Println("Use --force to overwrite.")
-	}
+	fmt.Printf("Installed Codex/OpenAI skill to %s\n", skillDir)
 	return nil
 }
 
@@ -205,17 +180,12 @@ func codexHome() (string, error) {
 	return filepath.Join(home, ".codex"), nil
 }
 
-func writeSkillFile(path string, content []byte, force bool) (bool, error) {
-	if _, err := os.Stat(path); err == nil && !force {
-		return false, nil
-	} else if err != nil && !os.IsNotExist(err) {
-		return false, err
-	}
+func writeSkillFile(path string, content []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return false, fmt.Errorf("creating skills directory: %w", err)
+		return fmt.Errorf("creating skills directory: %w", err)
 	}
 	if err := os.WriteFile(path, content, 0644); err != nil {
-		return false, fmt.Errorf("writing skill file: %w", err)
+		return fmt.Errorf("writing skill file: %w", err)
 	}
-	return true, nil
+	return nil
 }
