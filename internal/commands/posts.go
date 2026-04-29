@@ -134,7 +134,7 @@ func newPostsCreateCmd() *cobra.Command {
 		Use:   "create --type <type> --data '<json>'",
 		Short: "Create a post",
 		Example: `  pintomind posts create --type image --data '{"name":"Spring","title":"New collection","duration_per_item":7,"media_resources":[{"media_id":42}]}'
-  pintomind posts create --type plain --data '{"title":"Hello","content":"World"}'
+  pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","body":"<p>World</p>","media_box_ids":[201,202]}'
   pintomind posts create --type poster --source-id <template-id> --data '{"name":"My poster"}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)

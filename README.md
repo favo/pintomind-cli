@@ -329,39 +329,34 @@ pintomind resources update <resource-id> --data '{"poster_data": "<json-string>"
 
 ### Media Boxes
 
-Media boxes attach content (images, icons, emojis, QR codes, GIFs, Unsplash photos) to nodes inside a poster template. Pass them inline on `resources[0]` or set them directly on the backing resource.
+Media boxes are reusable visual slots for plain posts. Create boxes first, then pass their IDs to a plain post in `media_box_ids` slot order. The API picks the plain-post grid variation from the number of boxes.
 
 ```bash
-# Create poster with media boxes
-pintomind posts create --type poster --source-id <template-id> --data '{
-  "name": "Birthday poster",
-  "resources": [{
-    "media_boxes": {
-      "image": {
-        "0": {"position": "hero-image", "type": "media", "media_id": 42, "background_size": "cover"},
-        "1": {"position": "avatar",     "type": "emoji", "emoji": "🎂"}
-      }
-    }
-  }]
-}'
+pintomind media-boxes list
+pintomind media-boxes list --type media,emoji
+pintomind media-boxes list --post-id <post-id>
+pintomind media-boxes show <id>
 
-# Update media boxes on the backing resource
-pintomind resources update <resource-id> --data '{
-  "media_boxes": {
-    "image": {
-      "0": {"position": "hero-image", "type": "media", "media_id": 42},
-      "1": {"position": "logo",       "type": "icon",  "icon_name": "user"}
-    }
-  }
-}'
+# Create boxes
+pintomind media-boxes create --type media --data '{"media_id":42,"background_size":"cover"}'
+pintomind media-boxes create --type icon --data '{"icon_name":"rocket-launch","icon_type":"regular"}'
+pintomind media-boxes create --type emoji --data '{"emoji":"✨"}'
 
-# Clear all media boxes
-pintomind resources update <resource-id> --data '{"media_boxes": {"image": {}}}'
+# Update or delete boxes
+pintomind media-boxes update <id> --data '{"icon_name":"fire"}'
+pintomind media-boxes delete <id>
+pintomind media-boxes delete <id> --force
+
+# Attach boxes to a plain post
+pintomind posts create --type plain --data '{
+  "name":"Welcome",
+  "heading":"<p>Hello</p>",
+  "body":"<p>Welcome to the office</p>",
+  "media_box_ids":[201,202]
+}'
 ```
 
-The outer key is always `"image"`. Inner keys are sequential string integers (`"0"`, `"1"`, …). Each submission **fully replaces** the field.
-
-Media box types: `media` (requires `media_id`), `icon` (requires `icon_name`), `emoji` (requires `emoji`), `qr_code` (requires `url`), `gif` (requires `gif_id`, `gif_url`), `unsplash` (requires `photo_id`, `photo_url`).
+Media box types: `media` (requires `media_id`), `icon` (requires `icon_name`, usually `icon_type`), `emoji` (requires `emoji`), `gif` (requires `gif_id`, `gif_url`), `unsplash` (requires `photo_url`). Inspect exact fields with `pintomind schemas show media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, or `media_box_unsplash`.
 
 ### Schemas
 

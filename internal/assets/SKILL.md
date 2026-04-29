@@ -139,6 +139,8 @@ Post schema keys: `post_plain`, `post_image`, `post_video`, `post_youtube`, `pos
 
 Reference keys: `grid_templates` — catalog of named grid layouts used by `post_plain` variation.
 
+Media box schema keys: `media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, `media_box_unsplash`, `media_box_qr_code`.
+
 ## Media Collections
 
 ```bash
@@ -207,8 +209,8 @@ Common shared fields: `name`, `title`, `duration`, `show_title`, `area`.
 # Plain text post
 pintomind posts create --type plain --data '{
   "name":"Welcome",
-  "title":"Hello",
-  "content":"Welcome to the office",
+  "heading":"<p>Hello</p>",
+  "body":"<p>Welcome to the office</p>",
   "justification":"center",
   "fontsize":"large"
 }'
@@ -334,6 +336,13 @@ pintomind posts update <post-id> --data '{
 # 4. Or update the backing resource directly
 pintomind resources update <resource-id> --data '{"poster_data": "{\"backgroundFill\":\"#fff\",\"aspectRatio\":\"16/9\"}"}'
 
+# 4b. Attach media boxes to poster nodes (hash of node-position → media_box_id)
+pintomind posts update <post-id> --data '{
+  "resources": [{"media_box_ids": {"hero-image": 201}}]
+}'
+# Or directly on the resource:
+pintomind resources update <resource-id> --data '{"media_box_ids": {"hero-image": 201}}'
+
 # 5. Publish to a channel
 pintomind posts publish <post-id> <channel-id>
 ```
@@ -372,54 +381,57 @@ pintomind resources update <resource-id> --data '{"poster_data": "<json-string>"
 
 `poster_data` is a JSON string with top-level keys: `backgroundFill`, `templateDimensions`, `templates`, `aspectRatio`, `metaDescription`.
 
+`poster_page` resources also accept `media_box_ids` (hash) and `color_palette_id`. Both can be updated inline via `post.resources[]` or directly via `resources update`.
+
 **Note:** `poster_page` resources are auto-created by poster posts. Do not create them manually via `resources create`.
 
 ### Media Boxes
 
-Media boxes attach content (images, icons, emojis, QR codes, GIFs, Unsplash photos) to nodes inside a poster template. A node accepts a media box when its fills include a fill of type `"media"`. Use the node's `id` from the template as the `position` value.
+Media boxes are visual containers used by both plain posts and poster posts.
 
-Pass `media_boxes` inline on `resources[0]` when creating or updating a poster post, or set them directly on the backing resource:
+**Plain posts** use `media_box_ids` as an **array** of IDs in slot order. The server writes each box UUID into the selected grid and sets `post_id` on the attached boxes. Max 4 boxes; grid variation selected by count: 0 → `R12-HT`, 1 → `R12-HIT`, 2 → `R121-HIIT`, 3 → `R131-HIIIT`, 4 → `R14-HIIIIT`.
+
+**Poster posts** use `media_box_ids` as a **hash** of `{ "node-position": box_id }` on the backing `PosterPageResource`. The key is the `id` of the target node inside the poster template. Each submission is a full replacement; omitted positions are removed. Pass `{}` to remove all.
 
 ```bash
-# Create poster with media boxes inline
-pintomind posts create --type poster --source-id <template-id> --data '{
-  "name": "Birthday poster",
-  "resources": [{
-    "media_boxes": {
-      "image": {
-        "0": {"position": "hero-image", "type": "media", "media_id": 42, "background_size": "cover"},
-        "1": {"position": "avatar", "type": "emoji", "emoji": "🎂"}
-      }
-    }
-  }]
+pintomind media-boxes list
+pintomind media-boxes list --type media,emoji
+pintomind media-boxes list --post-id <post-id>
+pintomind media-boxes show <id>
+
+# Create boxes
+pintomind media-boxes create --type media --data '{"media_id":42,"background_size":"cover","background_fill_type":"default","x":0.5,"y":0.5}'
+pintomind media-boxes create --type icon --data '{"icon_name":"rocket-launch","icon_type":"regular","relative_size":0.8}'
+pintomind media-boxes create --type emoji --data '{"emoji":"✨"}'
+
+# Update/delete boxes
+pintomind media-boxes update <id> --data '{"icon_name":"fire"}'
+pintomind media-boxes delete <id> --force
+
+# Attach boxes to a plain post (array, slot order)
+pintomind posts create --type plain --data '{
+  "name":"Welcome",
+  "heading":"<p>Hello</p>",
+  "body":"<p>Welcome to the office</p>",
+  "media_box_ids":[201,202]
 }'
 
-# Update media boxes on an existing poster (via post)
+# Replace attached boxes on an existing plain post
+pintomind posts update <post-id> --data '{"media_box_ids":[203]}'
+
+# Attach boxes to a poster post (hash of node-position → id, via resources)
 pintomind posts update <post-id> --data '{
-  "resources": [{
-    "media_boxes": {
-      "image": {
-        "0": {"position": "hero-image", "type": "icon", "icon_name": "star"}
-      }
-    }
-  }]
+  "resources": [{"media_box_ids": {"hero-image": 201, "avatar": 202}}]
 }'
 
-# Update media boxes directly on the backing resource
-pintomind resources update <resource-id> --data '{
-  "media_boxes": {
-    "image": {
-      "0": {"position": "hero-image", "type": "media", "media_id": 42},
-      "1": {"position": "logo",       "type": "icon",  "icon_name": "user"}
-    }
-  }
-}'
+# Attach via poster_page resource directly
+pintomind resources update <resource-id> --data '{"media_box_ids": {"hero-image": 201}}'
 
-# Clear all media boxes from a resource
-pintomind resources update <resource-id> --data '{"media_boxes": {"image": {}}}'
+# Remove all poster media boxes
+pintomind resources update <resource-id> --data '{"media_box_ids": {}}'
 ```
 
-The outer key is always `"image"`. The inner keys are sequential string integers (`"0"`, `"1"`, …), one per node. Each submission **fully replaces** the field — positions not listed are removed.
+Removing a box ID from a plain post update deletes the orphaned box. For poster posts, each `media_box_ids` hash submission is a full replacement.
 
 #### Media box types
 
@@ -428,11 +440,11 @@ The outer key is always `"image"`. The inner keys are sequential string integers
 | `media` | `media_id` (integer — ID from media library) | `background_size` (`"cover"`/`"contain"`, default `"cover"`), `x`, `y` (0–1 focal point, default `0.5`) |
 | `icon` | `icon_name` (string) | `icon_type`, `relative_size` (default `0.9`) |
 | `emoji` | `emoji` (Unicode character, e.g. `"🎂"`) | `relative_size` (default `0.9`) |
-| `qr_code` | `url` (string) | `relative_size` (default `0.9`) |
-| `gif` | `gif_id`, `gif_url` | `background_size`, `x`, `y`, `gif_source`, `preview_url` |
-| `unsplash` | `photo_id`, `photo_url` | `background_size` (default `"cover"`), `x`, `y`, `author_name`, `author_url` |
+| `gif` | `gif_id` (URL and metadata auto-fetched from Giphy) | `background_size`, `x`, `y` |
+| `unsplash` | `photo_id` (URL and author data auto-fetched from Unsplash) | `background_size` (default `"cover"`), `x`, `y` |
+| `qr_code` | `url` (URL to encode) | `relative_size` (default `0.9`) |
 
-Both the alias (`"media"`) and class name (`"ImageMediaBox"`) are accepted as `type` on input. Responses always use the alias.
+Inspect exact fields with `pintomind schemas show media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, `media_box_unsplash`, or `media_box_qr_code`.
 
 ## Themes
 
