@@ -151,6 +151,10 @@ pintomind resources create html --html-code "<h1>Hello</h1>" --title "Heading"
 
 # YouTube resource
 pintomind resources create youtube --url "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --title "Video"
+
+# Location resource (used for weather/forecast posts)
+pintomind resources create location --name "Oslo" --lat 59.9139 --lon 10.7522 --country-code NO --timezone Europe/Oslo
+pintomind resources create location --name "Oslo" --lat 59.9139 --lon 10.7522 --country-code NO --timezone Europe/Oslo --altitude 23 --country "Norway"
 ```
 
 ### Creating resources — raw JSON
@@ -249,8 +253,17 @@ pintomind posts create feed --name "News" --url https://example.com/rss.xml --ch
 # Calendar post — creates a calendar resource from an iCal/WebCal URL
 pintomind posts create calendar --name "Events" --url https://cal.example.com/feed.ics --channel-id 7
 
-# Iframe post — creates an external_webpage resource (https only)
+# Iframe post — create from a URL, HTML content, or image URL (exactly one required)
 pintomind posts create iframe --name "Dashboard" --url https://dashboard.example.com --channel-id 7
+pintomind posts create iframe --name "Announcement" --html "<h1>Hello</h1>" --channel-id 7
+pintomind posts create iframe --name "Banner" --image https://example.com/banner.png --channel-id 7
+
+# HTML post — shortcut for iframe with HTML content (creates html resource + iframe post)
+pintomind posts create html --name "Announcement" --html "<h1>Hello world</h1>" --channel-id 7
+
+# Poster post — from a network template
+pintomind posts create poster --name "Spring campaign" --source-id 42 --channel-id 7
+pintomind posts create poster --name "Brand poster" --source-id 42 --color-palette-id 5 --channel-id 7
 ```
 
 All `posts create <type>` helpers accept:
@@ -265,7 +278,7 @@ One-liner for the most common flow: upload a file and publish to a channel.
 ```bash
 pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
 pintomind publish https://example.com/photo.jpg --channel-id 7 --channel-id 8
-pintomind publish ./photo.jpg --channel-id 7 --collection-id 12 --duration 10
+pintomind publish ./photo.jpg --channel-id 7 --media-collection 12 --duration 10
 ```
 
 Auto-detects the default image collection. Use `--collection-id` to override.

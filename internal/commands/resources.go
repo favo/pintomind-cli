@@ -24,6 +24,7 @@ func NewResourcesCmd() *cobra.Command {
 	createCmd.AddCommand(newResourcesCreateQRCodeCmd())
 	createCmd.AddCommand(newResourcesCreateHTMLCmd())
 	createCmd.AddCommand(newResourcesCreateYouTubeCmd())
+	createCmd.AddCommand(newResourcesCreateLocationCmd())
 	cmd.AddCommand(createCmd)
 	cmd.AddCommand(newResourcesUpdateCmd())
 	cmd.AddCommand(newResourcesAppendCmd())
@@ -103,7 +104,7 @@ func newResourcesCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create --type <type> --data '<json>'",
 		Short: "Create a resource",
-		Example: `  pintomind resources create --type text_slide --data '{"title":"Hello","body":"World"}'`,
+		Example: `  pintomind resources create --type text --data '{"label":"Hello","text":"World"}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			var resource map[string]any

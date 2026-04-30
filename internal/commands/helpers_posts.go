@@ -195,7 +195,7 @@ func NewPublishCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Post name (defaults to filename)")
-	cmd.Flags().IntVar(&collectionID, "collection-id", 0, "Media collection ID for upload (defaults to default image collection)")
+	cmd.Flags().IntVar(&collectionID, "media-collection", 0, "Media collection ID for upload (defaults to default image collection)")
 	cmd.Flags().IntVar(&duration, "duration", 7, "Seconds per slide")
 	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
 	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
@@ -458,9 +458,230 @@ func newPostsCreateCalendarCmd() *cobra.Command {
 }
 
 func newPostsCreateIframeCmd() *cobra.Command {
-	return newPostsCreateURLResourcePostCmd(
-		"iframe",
-		"Create an iframe post embedding a web page (https only)",
-		"iframe", "external_webpage", "url",
-	)
+	var name, urlStr, htmlContent, imageURL string
+	var channelIDs []int
+	var area string
+	var fullScreen bool
+
+	cmd := &cobra.Command{
+		Use:   "iframe",
+		Short: "Create an iframe post from a URL, HTML content, or image URL",
+		Example: `  pintomind posts create iframe --name "Dashboard" --url https://dashboard.example.com --channel-id 7
+  pintomind posts create iframe --name "Announcement" --html "<h1>Hello</h1>" --channel-id 7
+  pintomind posts create iframe --name "Banner" --image https://example.com/banner.png --channel-id 7`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+
+			urlChanged := cmd.Flags().Changed("url")
+			htmlChanged := cmd.Flags().Changed("html")
+			imageChanged := cmd.Flags().Changed("image")
+			count := 0
+			for _, b := range []bool{urlChanged, htmlChanged, imageChanged} {
+				if b {
+					count++
+				}
+			}
+			if count == 0 {
+				return fmt.Errorf("provide one of --url, --html, or --image")
+			}
+			if count > 1 {
+				return fmt.Errorf("only one of --url, --html, or --image may be specified")
+			}
+
+			var resourceType string
+			resourceData := map[string]any{}
+			if name != "" {
+				resourceData["title"] = name
+			}
+			switch {
+			case urlChanged:
+				resourceType = "external_webpage"
+				resourceData["url"] = urlStr
+			case htmlChanged:
+				resourceType = "html"
+				resourceData["html_code"] = htmlContent
+			case imageChanged:
+				resourceType = "external_image"
+				resourceData["url"] = imageURL
+			}
+
+			resourceID, err := createResource(a, resourceType, resourceData)
+			if err != nil {
+				return fmt.Errorf("creating %s resource: %w", resourceType, err)
+			}
+			if !a.JSONOutput {
+				fmt.Printf("Created %s resource %d\n", resourceType, resourceID)
+			}
+
+			post := map[string]any{"resource_ids": []int{resourceID}}
+			if name != "" {
+				post["name"] = name
+			}
+
+			var postResp map[string]any
+			if err := a.Client.Post("/posts", map[string]any{
+				"type": "iframe",
+				"post": post,
+			}, &postResp); err != nil {
+				return err
+			}
+
+			postID, err := intFromNestedResp(postResp, "post", "id")
+			if err != nil {
+				return err
+			}
+			if !a.JSONOutput {
+				fmt.Printf("Created iframe post %d\n", postID)
+			}
+
+			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
+				return err
+			}
+
+			if a.JSONOutput {
+				printJSON(postResp)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&name, "name", "", "Post name")
+	cmd.Flags().StringVar(&urlStr, "url", "", "Webpage URL to embed (https only)")
+	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display")
+	cmd.Flags().StringVar(&imageURL, "image", "", "Image URL to display (https only)")
+	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
+	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
+	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	return cmd
+}
+
+func newPostsCreateHTMLCmd() *cobra.Command {
+	var name, htmlContent string
+	var channelIDs []int
+	var area string
+	var fullScreen bool
+
+	cmd := &cobra.Command{
+		Use:   "html",
+		Short: "Create an iframe post displaying HTML content",
+		Example: `  pintomind posts create html --name "Announcement" --html "<h1>Hello world</h1>" --channel-id 7`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+
+			resourceData := map[string]any{"html_code": htmlContent}
+			if name != "" {
+				resourceData["title"] = name
+			}
+
+			resourceID, err := createResource(a, "html", resourceData)
+			if err != nil {
+				return err
+			}
+			if !a.JSONOutput {
+				fmt.Printf("Created html resource %d\n", resourceID)
+			}
+
+			post := map[string]any{"resource_ids": []int{resourceID}}
+			if name != "" {
+				post["name"] = name
+			}
+
+			var postResp map[string]any
+			if err := a.Client.Post("/posts", map[string]any{
+				"type": "iframe",
+				"post": post,
+			}, &postResp); err != nil {
+				return err
+			}
+
+			postID, err := intFromNestedResp(postResp, "post", "id")
+			if err != nil {
+				return err
+			}
+			if !a.JSONOutput {
+				fmt.Printf("Created html post %d\n", postID)
+			}
+
+			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
+				return err
+			}
+
+			if a.JSONOutput {
+				printJSON(postResp)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&name, "name", "", "Post name")
+	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display (required)")
+	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
+	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
+	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	_ = cmd.MarkFlagRequired("html")
+	return cmd
+}
+
+func newPostsCreatePosterCmd() *cobra.Command {
+	var name, sourceID string
+	var colorPaletteID int
+	var channelIDs []int
+	var area string
+	var fullScreen bool
+
+	cmd := &cobra.Command{
+		Use:   "poster",
+		Short: "Create a poster post, optionally from a network template",
+		Example: `  pintomind posts create poster --name "Spring campaign" --source-id 42 --channel-id 7
+  pintomind posts create poster --name "Brand poster" --source-id 42 --color-palette-id 5 --channel-id 7`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+
+			post := map[string]any{}
+			if name != "" {
+				post["name"] = name
+			}
+			if cmd.Flags().Changed("color-palette-id") {
+				post["resources"] = []map[string]any{{"color_palette_id": colorPaletteID}}
+			}
+
+			body := map[string]any{
+				"type": "poster",
+				"post": post,
+			}
+			if sourceID != "" {
+				body["source_id"] = sourceID
+			}
+
+			var postResp map[string]any
+			if err := a.Client.Post("/posts", body, &postResp); err != nil {
+				return err
+			}
+
+			postID, err := intFromNestedResp(postResp, "post", "id")
+			if err != nil {
+				return err
+			}
+			if !a.JSONOutput {
+				fmt.Printf("Created poster post %d\n", postID)
+			}
+
+			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
+				return err
+			}
+
+			if a.JSONOutput {
+				printJSON(postResp)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&name, "name", "", "Post name")
+	cmd.Flags().StringVar(&sourceID, "source-id", "", "Network poster template ID to duplicate")
+	cmd.Flags().IntVar(&colorPaletteID, "color-palette-id", 0, "Color palette ID to apply to the poster")
+	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
+	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
+	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	return cmd
 }

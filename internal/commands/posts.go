@@ -48,6 +48,8 @@ func NewPostsCmd() *cobra.Command {
 	createCmd.AddCommand(newPostsCreateFeedCmd())
 	createCmd.AddCommand(newPostsCreateCalendarCmd())
 	createCmd.AddCommand(newPostsCreateIframeCmd())
+	createCmd.AddCommand(newPostsCreateHTMLCmd())
+	createCmd.AddCommand(newPostsCreatePosterCmd())
 	cmd.AddCommand(createCmd)
 	cmd.AddCommand(newPostsUpdateCmd())
 	cmd.AddCommand(newPostsDeleteCmd())

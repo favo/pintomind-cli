@@ -164,6 +164,63 @@ func newResourcesCreateHTMLCmd() *cobra.Command {
 	return cmd
 }
 
+func newResourcesCreateLocationCmd() *cobra.Command {
+	var name, countryCode, timezone, country, adminArea1, adminArea2 string
+	var latitude, longitude, altitude float64
+
+	cmd := &cobra.Command{
+		Use:   "location",
+		Short: "Create a location resource (used for weather/forecast posts)",
+		Example: `  pintomind resources create location --name "Oslo" --lat 59.9139 --lon 10.7522 --country-code NO --timezone Europe/Oslo`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			data := map[string]any{
+				"name":         name,
+				"latitude":     latitude,
+				"longitude":    longitude,
+				"country_code": countryCode,
+				"timezone":     timezone,
+			}
+			if country != "" {
+				data["country"] = country
+			}
+			if adminArea1 != "" {
+				data["admin_area1"] = adminArea1
+			}
+			if adminArea2 != "" {
+				data["admin_area2"] = adminArea2
+			}
+			if cmd.Flags().Changed("altitude") {
+				data["altitude"] = altitude
+			}
+			var resp map[string]any
+			if err := a.Client.Post("/resources", map[string]any{
+				"type":     "location",
+				"resource": data,
+			}, &resp); err != nil {
+				return err
+			}
+			printJSON(resp)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "Location name (required)")
+	cmd.Flags().Float64Var(&latitude, "lat", 0, "Latitude -90 to 90 (required)")
+	cmd.Flags().Float64Var(&longitude, "lon", 0, "Longitude -180 to 180 (required)")
+	cmd.Flags().StringVar(&countryCode, "country-code", "", "ISO 3166-1 alpha-2 country code, e.g. NO (required)")
+	cmd.Flags().StringVar(&timezone, "timezone", "", "IANA timezone, e.g. Europe/Oslo (required)")
+	cmd.Flags().StringVar(&country, "country", "", "Country name")
+	cmd.Flags().StringVar(&adminArea1, "admin-area1", "", "Administrative area level 1 (e.g. state/county)")
+	cmd.Flags().StringVar(&adminArea2, "admin-area2", "", "Administrative area level 2 (e.g. municipality)")
+	cmd.Flags().Float64Var(&altitude, "altitude", 0, "Altitude in metres (-1000 to 10000)")
+	_ = cmd.MarkFlagRequired("name")
+	_ = cmd.MarkFlagRequired("lat")
+	_ = cmd.MarkFlagRequired("lon")
+	_ = cmd.MarkFlagRequired("country-code")
+	_ = cmd.MarkFlagRequired("timezone")
+	return cmd
+}
+
 func newResourcesCreateYouTubeCmd() *cobra.Command {
 	var title, youtubeURL string
 
