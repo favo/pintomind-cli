@@ -115,11 +115,48 @@ pintomind resources show <id>
 pintomind resources stats
 pintomind resources refresh <id>
 
-pintomind resources create --type text --data '{"label":"Hello","text":"World"}'
 pintomind resources update <id> --data '{"label":"Updated"}'
 pintomind resources append <id> --items '[{"text":"item 1"}]'
 pintomind resources delete <id>
 pintomind resources delete <id> --force
+```
+
+### Creating resources — helper subcommands
+
+Type-specific subcommands replace the need for raw JSON.
+
+```bash
+# Text resource
+pintomind resources create text --label "Greeting" --text "Hello world"
+
+# Feed resource (RSS/Atom)
+pintomind resources create feed --url https://example.com/rss.xml --title "News"
+
+# Calendar resource (iCal/WebCal URL)
+pintomind resources create calendar --url https://cal.example.com/feed.ics --title "Events"
+pintomind resources create calendar --url webcal://cal.example.com/feed.ics --color "#FF5733"
+
+# External webpage (iframe, https only)
+pintomind resources create external-webpage --url https://dashboard.example.com --title "Dashboard"
+
+# External image (from URL)
+pintomind resources create external-image --url https://example.com/logo.png --title "Logo"
+
+# QR code
+pintomind resources create qr-code --url https://example.com --title "Website"
+pintomind resources create qr-code --url https://example.com --label-text "Scan me"
+
+# HTML resource
+pintomind resources create html --html-code "<h1>Hello</h1>" --title "Heading"
+
+# YouTube resource
+pintomind resources create youtube --url "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --title "Video"
+```
+
+### Creating resources — raw JSON
+
+```bash
+pintomind resources create --type text --data '{"label":"Hello","text":"World"}'
 ```
 
 ## Schemas
@@ -191,9 +228,51 @@ pintomind posts delete <id>
 pintomind posts delete <id> --force
 ```
 
-### Creating posts
+### Creating posts — helper subcommands
 
-`posts create` takes a `--type` (post type alias) and a `--data` JSON object describing the post. The CLI wraps it in `{"type": ..., "post": {...}}` for you.
+Type-specific subcommands handle uploads, resource creation, and publishing in one step. The raw `--type / --data` form still works for all other post types.
+
+```bash
+# Image post — upload files and/or reference existing media IDs
+pintomind posts create image --name "Gallery" --image ./a.jpg --image ./b.jpg --channel-id 7
+pintomind posts create image --name "Promo" --media 42 --media 43 --duration 10
+pintomind posts create image --name "Mix" --image ./photo.jpg --media 55 --channel-id 7 --channel-id 8
+pintomind posts create image --name "X" --image ./photo.jpg --media-collection 12  # override collection
+
+# Plain text post
+pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
+pintomind posts create plain --name "Msg" --heading "<p>Hi</p>" --body "<p>Body</p>" --justification center --fontsize large
+
+# Feed post — creates a feed resource then the post
+pintomind posts create feed --name "News" --url https://example.com/rss.xml --channel-id 7
+
+# Calendar post — creates a calendar resource from an iCal/WebCal URL
+pintomind posts create calendar --name "Events" --url https://cal.example.com/feed.ics --channel-id 7
+
+# Iframe post — creates an external_webpage resource (https only)
+pintomind posts create iframe --name "Dashboard" --url https://dashboard.example.com --channel-id 7
+```
+
+All `posts create <type>` helpers accept:
+- `--channel-id N` (repeatable) — publish to one or more channels immediately
+- `--area F11` — channel area for all publications
+- `--full-screen` — publish fullscreen to all channels
+
+### Top-level `publish` shorthand
+
+One-liner for the most common flow: upload a file and publish to a channel.
+
+```bash
+pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
+pintomind publish https://example.com/photo.jpg --channel-id 7 --channel-id 8
+pintomind publish ./photo.jpg --channel-id 7 --collection-id 12 --duration 10
+```
+
+Auto-detects the default image collection. Use `--collection-id` to override.
+
+### Creating posts — raw JSON (all post types)
+
+`posts create --type <alias> --data '<json>'` accepts any post type. The CLI wraps it in `{"type": ..., "post": {...}}` for you.
 
 **Important:** all post fields — including type-specific ones — are flat inside the `post` object. Do not wrap them in an `options` sub-object.
 
@@ -208,15 +287,6 @@ pintomind schemas show post_calendar
 Common shared fields: `name`, `title`, `duration`, `show_title`, `area`.
 
 ```bash
-# Plain text post
-pintomind posts create --type plain --data '{
-  "name":"Welcome",
-  "heading":"<p>Hello</p>",
-  "body":"<p>Welcome to the office</p>",
-  "justification":"center",
-  "fontsize":"large"
-}'
-
 # Image post — use media_resources with media_id values from `pintomind media upload`
 pintomind posts create --type image --data '{
   "name":"Spring campaign",
@@ -241,7 +311,7 @@ pintomind posts create --type clock --data '{
   "show_date":true
 }'
 
-# Calendar post
+# Calendar post (raw)
 pintomind posts create --type calendar --data '{
   "name":"Today",
   "template":"list",
@@ -560,9 +630,10 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Create a palette and use it in a theme: `pintomind color-palettes create --name "Brand" --primary-color "#1F8A8A"` then `pintomind themes update <theme-id> --data '{"color_palette_id":<id>}'`
 - Add a Google Font: `pintomind font-families create --type remote_css --name "Inter" --url "https://fonts.googleapis.com/css2?family=Inter:wght@400;700"`
 - Upload a file to media: `pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"`
+- Publish a photo to a channel in one step: `pintomind publish ./photo.jpg --channel-id 7`
 - Inspect valid resource fields: `pintomind schemas show text`
 - Inspect valid post fields: `pintomind schemas show post_image` (prefix `post_`)
-- Publishing is separate from creating: `posts create` then `posts publish <post-id> <channel-id>`
+- Publishing is separate from raw `posts create`: use `posts publish <post-id> <channel-id>` or pass `--channel-id` to helper subcommands
 - Image and video posts use `media_resources:[{"media_id":...}]`, not `resource_ids`
 - Post fields are always flat inside `post` — no `options` sub-object
 - Use `--account develop` to target the dev environment without changing your default.
