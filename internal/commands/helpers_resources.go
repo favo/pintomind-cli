@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -22,15 +21,7 @@ func newResourcesCreateURLCmd(use, short, resourceType string, extraFlags func(c
 			if extraFlags != nil {
 				extraFlags(cmd, data)
 			}
-			var resp map[string]any
-			if err := a.Client.Post("/resources", map[string]any{
-				"type":     resourceType,
-				"resource": data,
-			}, &resp); err != nil {
-				return err
-			}
-			printJSON(resp)
-			return nil
+			return createResourceAndPrint(a, resourceType, data)
 		},
 	}
 	cmd.Flags().StringVar(&title, "title", "", "Resource title")
@@ -52,15 +43,7 @@ func newResourcesCreateTextCmd() *cobra.Command {
 			if cmd.Flags().Changed("text") {
 				data["text"] = text
 			}
-			var resp map[string]any
-			if err := a.Client.Post("/resources", map[string]any{
-				"type":     "text",
-				"resource": data,
-			}, &resp); err != nil {
-				return err
-			}
-			printJSON(resp)
-			return nil
+			return createResourceAndPrint(a, "text", data)
 		},
 	}
 	cmd.Flags().StringVar(&label, "label", "", "Resource label (required)")
@@ -148,15 +131,7 @@ func newResourcesCreateHTMLCmd() *cobra.Command {
 			if cmd.Flags().Changed("html-code") {
 				data["html_code"] = htmlCode
 			}
-			var resp map[string]any
-			if err := a.Client.Post("/resources", map[string]any{
-				"type":     "html",
-				"resource": data,
-			}, &resp); err != nil {
-				return err
-			}
-			printJSON(resp)
-			return nil
+			return createResourceAndPrint(a, "html", data)
 		},
 	}
 	cmd.Flags().StringVar(&title, "title", "", "Resource title")
@@ -193,15 +168,7 @@ func newResourcesCreateLocationCmd() *cobra.Command {
 			if cmd.Flags().Changed("altitude") {
 				data["altitude"] = altitude
 			}
-			var resp map[string]any
-			if err := a.Client.Post("/resources", map[string]any{
-				"type":     "location",
-				"resource": data,
-			}, &resp); err != nil {
-				return err
-			}
-			printJSON(resp)
-			return nil
+			return createResourceAndPrint(a, "location", data)
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "Location name (required)")
@@ -234,15 +201,7 @@ func newResourcesCreateYouTubeCmd() *cobra.Command {
 			if title != "" {
 				data["title"] = title
 			}
-			var resp map[string]any
-			if err := a.Client.Post("/resources", map[string]any{
-				"type":     "youtube",
-				"resource": data,
-			}, &resp); err != nil {
-				return err
-			}
-			printJSON(resp)
-			return nil
+			return createResourceAndPrint(a, "youtube", data)
 		},
 	}
 	cmd.Flags().StringVar(&title, "title", "", "Title override (defaults to YouTube video title)")

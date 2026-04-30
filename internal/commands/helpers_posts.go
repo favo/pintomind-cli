@@ -12,6 +12,19 @@ import (
 	"favo/pintomind-cli/internal/appctx"
 )
 
+// publishOpts holds the common publish-target flags shared by all post-creation commands.
+type publishOpts struct {
+	channelIDs []int
+	area       string
+	fullScreen bool
+}
+
+func addPublishFlags(cmd *cobra.Command, p *publishOpts) {
+	cmd.Flags().IntSliceVar(&p.channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
+	cmd.Flags().StringVar(&p.area, "area", "", "Channel area for publication")
+	cmd.Flags().BoolVar(&p.fullScreen, "full-screen", false, "Publish as fullscreen")
+}
+
 // findDefaultCollection returns the ID of the first default collection matching category.
 func findDefaultCollection(a *appctx.App, category string) (int, error) {
 	var resp MediaCollectionsResponse
@@ -90,6 +103,94 @@ func createResource(a *appctx.App, resourceType string, data map[string]any) (in
 	return intFromNestedResp(resp, "resource", "id")
 }
 
+// createResourceAndPrint creates a resource and prints the full response as JSON.
+func createResourceAndPrint(a *appctx.App, resourceType string, data map[string]any) error {
+	var resp map[string]any
+	if err := a.Client.Post("/resources", map[string]any{
+		"type":     resourceType,
+		"resource": data,
+	}, &resp); err != nil {
+		return err
+	}
+	printJSON(resp)
+	return nil
+}
+
+// createAndPublishImagePost creates an image post from mediaIDs, then publishes to channels.
+func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, duration int, p publishOpts) error {
+	mediaResources := make([]map[string]any, len(mediaIDs))
+	for i, id := range mediaIDs {
+		mediaResources[i] = map[string]any{"media_id": id}
+	}
+	post := map[string]any{
+		"duration_per_item": duration,
+		"media_resources":   mediaResources,
+	}
+	if name != "" {
+		post["name"] = name
+	}
+
+	var postResp map[string]any
+	if err := a.Client.Post("/posts", map[string]any{"type": "image", "post": post}, &postResp); err != nil {
+		return err
+	}
+
+	postID, err := intFromNestedResp(postResp, "post", "id")
+	if err != nil {
+		return err
+	}
+	if !a.JSONOutput {
+		fmt.Printf("Created image post %d\n", postID)
+	}
+
+	if err := publishToChannels(a, postID, p.channelIDs, p.area, p.fullScreen); err != nil {
+		return err
+	}
+
+	if a.JSONOutput {
+		printJSON(postResp)
+	}
+	return nil
+}
+
+// createResourceBackedPost creates a resource, then a post wired to it, then publishes.
+func createResourceBackedPost(a *appctx.App, postType, resourceType string, resourceData map[string]any, name string, p publishOpts) error {
+	resourceID, err := createResource(a, resourceType, resourceData)
+	if err != nil {
+		return fmt.Errorf("creating %s resource: %w", resourceType, err)
+	}
+	if !a.JSONOutput {
+		fmt.Printf("Created %s resource %d\n", resourceType, resourceID)
+	}
+
+	post := map[string]any{"resource_ids": []int{resourceID}}
+	if name != "" {
+		post["name"] = name
+	}
+
+	var postResp map[string]any
+	if err := a.Client.Post("/posts", map[string]any{"type": postType, "post": post}, &postResp); err != nil {
+		return err
+	}
+
+	postID, err := intFromNestedResp(postResp, "post", "id")
+	if err != nil {
+		return err
+	}
+	if !a.JSONOutput {
+		fmt.Printf("Created %s post %d\n", postType, postID)
+	}
+
+	if err := publishToChannels(a, postID, p.channelIDs, p.area, p.fullScreen); err != nil {
+		return err
+	}
+
+	if a.JSONOutput {
+		printJSON(postResp)
+	}
+	return nil
+}
+
 // publishToChannels publishes postID to each channel, applying area and fullScreen to all.
 func publishToChannels(a *appctx.App, postID int, channelIDs []int, area string, fullScreen bool) error {
 	postIDStr := strconv.Itoa(postID)
@@ -130,9 +231,7 @@ func NewPublishCmd() *cobra.Command {
 	var name string
 	var collectionID int
 	var duration int
-	var channelIDs []int
-	var area string
-	var fullScreen bool
+	var pf publishOpts
 
 	cmd := &cobra.Command{
 		Use:   "publish <file-or-url>",
@@ -163,43 +262,14 @@ func NewPublishCmd() *cobra.Command {
 				postName = filepath.Base(input)
 			}
 
-			var postResp map[string]any
-			if err := a.Client.Post("/posts", map[string]any{
-				"type": "image",
-				"post": map[string]any{
-					"name":              postName,
-					"duration_per_item": duration,
-					"media_resources":   []map[string]any{{"media_id": mediaID}},
-				},
-			}, &postResp); err != nil {
-				return err
-			}
-
-			postID, err := intFromNestedResp(postResp, "post", "id")
-			if err != nil {
-				return err
-			}
-			if !a.JSONOutput {
-				fmt.Printf("Created image post %d %q\n", postID, postName)
-			}
-
-			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
-				return err
-			}
-
-			if a.JSONOutput {
-				printJSON(postResp)
-			}
-			return nil
+			return createAndPublishImagePost(a, postName, []int{mediaID}, duration, pf)
 		},
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Post name (defaults to filename)")
 	cmd.Flags().IntVar(&collectionID, "media-collection", 0, "Media collection ID for upload (defaults to default image collection)")
 	cmd.Flags().IntVar(&duration, "duration", 7, "Seconds per slide")
-	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
-	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
-	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	addPublishFlags(cmd, &pf)
 	return cmd
 }
 
@@ -210,9 +280,7 @@ func newPostsCreateImageCmd() *cobra.Command {
 	var mediaIDs []int
 	var mediaCollection int
 	var duration int
-	var channelIDs []int
-	var area string
-	var fullScreen bool
+	var pf publishOpts
 
 	cmd := &cobra.Command{
 		Use:   "image",
@@ -249,43 +317,7 @@ func newPostsCreateImageCmd() *cobra.Command {
 			}
 			allMediaIDs = append(allMediaIDs, mediaIDs...)
 
-			mediaResources := make([]map[string]any, len(allMediaIDs))
-			for i, id := range allMediaIDs {
-				mediaResources[i] = map[string]any{"media_id": id}
-			}
-
-			post := map[string]any{
-				"duration_per_item": duration,
-				"media_resources":   mediaResources,
-			}
-			if name != "" {
-				post["name"] = name
-			}
-
-			var postResp map[string]any
-			if err := a.Client.Post("/posts", map[string]any{
-				"type": "image",
-				"post": post,
-			}, &postResp); err != nil {
-				return err
-			}
-
-			postID, err := intFromNestedResp(postResp, "post", "id")
-			if err != nil {
-				return err
-			}
-			if !a.JSONOutput {
-				fmt.Printf("Created image post %d\n", postID)
-			}
-
-			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
-				return err
-			}
-
-			if a.JSONOutput {
-				printJSON(postResp)
-			}
-			return nil
+			return createAndPublishImagePost(a, name, allMediaIDs, duration, pf)
 		},
 	}
 
@@ -294,18 +326,14 @@ func newPostsCreateImageCmd() *cobra.Command {
 	cmd.Flags().IntSliceVar(&mediaIDs, "media", nil, "Existing media ID to include (repeatable)")
 	cmd.Flags().IntVar(&mediaCollection, "media-collection", 0, "Media collection ID for uploads (defaults to default image collection)")
 	cmd.Flags().IntVar(&duration, "duration", 7, "Seconds per slide")
-	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
-	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
-	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	addPublishFlags(cmd, &pf)
 	return cmd
 }
 
 // newPostsCreatePlainCmd creates a plain text post.
 func newPostsCreatePlainCmd() *cobra.Command {
 	var name, heading, body, justification, fontsize string
-	var channelIDs []int
-	var area string
-	var fullScreen bool
+	var pf publishOpts
 
 	cmd := &cobra.Command{
 		Use:   "plain",
@@ -337,10 +365,7 @@ func newPostsCreatePlainCmd() *cobra.Command {
 			}
 
 			var postResp map[string]any
-			if err := a.Client.Post("/posts", map[string]any{
-				"type": "plain",
-				"post": post,
-			}, &postResp); err != nil {
+			if err := a.Client.Post("/posts", map[string]any{"type": "plain", "post": post}, &postResp); err != nil {
 				return err
 			}
 
@@ -352,7 +377,7 @@ func newPostsCreatePlainCmd() *cobra.Command {
 				fmt.Printf("Created plain post %d\n", postID)
 			}
 
-			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
+			if err := publishToChannels(a, postID, pf.channelIDs, pf.area, pf.fullScreen); err != nil {
 				return err
 			}
 
@@ -368,75 +393,31 @@ func newPostsCreatePlainCmd() *cobra.Command {
 	cmd.Flags().StringVar(&body, "body", "", "Body HTML")
 	cmd.Flags().StringVar(&justification, "justification", "", "Text alignment: left, center, or right")
 	cmd.Flags().StringVar(&fontsize, "fontsize", "", "Font size: small, medium, large, or xlarge")
-	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
-	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
-	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	addPublishFlags(cmd, &pf)
 	return cmd
 }
 
 // newPostsCreateURLResourcePostCmd is a factory for post types backed by a single URL-based resource.
 func newPostsCreateURLResourcePostCmd(use, short, postType, resourceType, urlField string) *cobra.Command {
 	var name, urlStr string
-	var channelIDs []int
-	var area string
-	var fullScreen bool
+	var pf publishOpts
 
 	cmd := &cobra.Command{
 		Use:   use,
 		Short: short,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
-
 			resourceData := map[string]any{urlField: urlStr}
 			if name != "" {
 				resourceData["title"] = name
 			}
-
-			resourceID, err := createResource(a, resourceType, resourceData)
-			if err != nil {
-				return fmt.Errorf("creating %s resource: %w", resourceType, err)
-			}
-			if !a.JSONOutput {
-				fmt.Printf("Created %s resource %d\n", resourceType, resourceID)
-			}
-
-			post := map[string]any{"resource_ids": []int{resourceID}}
-			if name != "" {
-				post["name"] = name
-			}
-
-			var postResp map[string]any
-			if err := a.Client.Post("/posts", map[string]any{
-				"type": postType,
-				"post": post,
-			}, &postResp); err != nil {
-				return err
-			}
-
-			postID, err := intFromNestedResp(postResp, "post", "id")
-			if err != nil {
-				return err
-			}
-			if !a.JSONOutput {
-				fmt.Printf("Created %s post %d\n", postType, postID)
-			}
-
-			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
-				return err
-			}
-
-			if a.JSONOutput {
-				printJSON(postResp)
-			}
-			return nil
+			return createResourceBackedPost(a, postType, resourceType, resourceData, name, pf)
 		},
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
 	cmd.Flags().StringVar(&urlStr, "url", "", "URL (required)")
-	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
-	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
-	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	addPublishFlags(cmd, &pf)
 	_ = cmd.MarkFlagRequired("url")
 	return cmd
 }
@@ -459,9 +440,7 @@ func newPostsCreateCalendarCmd() *cobra.Command {
 
 func newPostsCreateIframeCmd() *cobra.Command {
 	var name, urlStr, htmlContent, imageURL string
-	var channelIDs []int
-	var area string
-	var fullScreen bool
+	var pf publishOpts
 
 	cmd := &cobra.Command{
 		Use:   "iframe",
@@ -472,76 +451,37 @@ func newPostsCreateIframeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 
-			urlChanged := cmd.Flags().Changed("url")
-			htmlChanged := cmd.Flags().Changed("html")
-			imageChanged := cmd.Flags().Changed("image")
-			count := 0
-			for _, b := range []bool{urlChanged, htmlChanged, imageChanged} {
-				if b {
-					count++
+			changed := 0
+			for _, f := range []string{"url", "html", "image"} {
+				if cmd.Flags().Changed(f) {
+					changed++
 				}
 			}
-			if count == 0 {
+			if changed == 0 {
 				return fmt.Errorf("provide one of --url, --html, or --image")
 			}
-			if count > 1 {
+			if changed > 1 {
 				return fmt.Errorf("only one of --url, --html, or --image may be specified")
 			}
 
-			var resourceType string
 			resourceData := map[string]any{}
 			if name != "" {
 				resourceData["title"] = name
 			}
+			var resourceType string
 			switch {
-			case urlChanged:
+			case cmd.Flags().Changed("url"):
 				resourceType = "external_webpage"
 				resourceData["url"] = urlStr
-			case htmlChanged:
+			case cmd.Flags().Changed("html"):
 				resourceType = "html"
 				resourceData["html_code"] = htmlContent
-			case imageChanged:
+			case cmd.Flags().Changed("image"):
 				resourceType = "external_image"
 				resourceData["url"] = imageURL
 			}
 
-			resourceID, err := createResource(a, resourceType, resourceData)
-			if err != nil {
-				return fmt.Errorf("creating %s resource: %w", resourceType, err)
-			}
-			if !a.JSONOutput {
-				fmt.Printf("Created %s resource %d\n", resourceType, resourceID)
-			}
-
-			post := map[string]any{"resource_ids": []int{resourceID}}
-			if name != "" {
-				post["name"] = name
-			}
-
-			var postResp map[string]any
-			if err := a.Client.Post("/posts", map[string]any{
-				"type": "iframe",
-				"post": post,
-			}, &postResp); err != nil {
-				return err
-			}
-
-			postID, err := intFromNestedResp(postResp, "post", "id")
-			if err != nil {
-				return err
-			}
-			if !a.JSONOutput {
-				fmt.Printf("Created iframe post %d\n", postID)
-			}
-
-			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
-				return err
-			}
-
-			if a.JSONOutput {
-				printJSON(postResp)
-			}
-			return nil
+			return createResourceBackedPost(a, "iframe", resourceType, resourceData, name, pf)
 		},
 	}
 
@@ -549,75 +489,31 @@ func newPostsCreateIframeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&urlStr, "url", "", "Webpage URL to embed (https only)")
 	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display")
 	cmd.Flags().StringVar(&imageURL, "image", "", "Image URL to display (https only)")
-	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
-	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
-	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	addPublishFlags(cmd, &pf)
 	return cmd
 }
 
 func newPostsCreateHTMLCmd() *cobra.Command {
 	var name, htmlContent string
-	var channelIDs []int
-	var area string
-	var fullScreen bool
+	var pf publishOpts
 
 	cmd := &cobra.Command{
-		Use:   "html",
-		Short: "Create an iframe post displaying HTML content",
+		Use:     "html",
+		Short:   "Create an iframe post displaying HTML content",
 		Example: `  pintomind posts create html --name "Announcement" --html "<h1>Hello world</h1>" --channel-id 7`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
-
 			resourceData := map[string]any{"html_code": htmlContent}
 			if name != "" {
 				resourceData["title"] = name
 			}
-
-			resourceID, err := createResource(a, "html", resourceData)
-			if err != nil {
-				return err
-			}
-			if !a.JSONOutput {
-				fmt.Printf("Created html resource %d\n", resourceID)
-			}
-
-			post := map[string]any{"resource_ids": []int{resourceID}}
-			if name != "" {
-				post["name"] = name
-			}
-
-			var postResp map[string]any
-			if err := a.Client.Post("/posts", map[string]any{
-				"type": "iframe",
-				"post": post,
-			}, &postResp); err != nil {
-				return err
-			}
-
-			postID, err := intFromNestedResp(postResp, "post", "id")
-			if err != nil {
-				return err
-			}
-			if !a.JSONOutput {
-				fmt.Printf("Created html post %d\n", postID)
-			}
-
-			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
-				return err
-			}
-
-			if a.JSONOutput {
-				printJSON(postResp)
-			}
-			return nil
+			return createResourceBackedPost(a, "iframe", "html", resourceData, name, pf)
 		},
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
 	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display (required)")
-	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
-	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
-	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	addPublishFlags(cmd, &pf)
 	_ = cmd.MarkFlagRequired("html")
 	return cmd
 }
@@ -625,9 +521,7 @@ func newPostsCreateHTMLCmd() *cobra.Command {
 func newPostsCreatePosterCmd() *cobra.Command {
 	var name, sourceID string
 	var colorPaletteID int
-	var channelIDs []int
-	var area string
-	var fullScreen bool
+	var pf publishOpts
 
 	cmd := &cobra.Command{
 		Use:   "poster",
@@ -645,10 +539,7 @@ func newPostsCreatePosterCmd() *cobra.Command {
 				post["resources"] = []map[string]any{{"color_palette_id": colorPaletteID}}
 			}
 
-			body := map[string]any{
-				"type": "poster",
-				"post": post,
-			}
+			body := map[string]any{"type": "poster", "post": post}
 			if sourceID != "" {
 				body["source_id"] = sourceID
 			}
@@ -666,7 +557,7 @@ func newPostsCreatePosterCmd() *cobra.Command {
 				fmt.Printf("Created poster post %d\n", postID)
 			}
 
-			if err := publishToChannels(a, postID, channelIDs, area, fullScreen); err != nil {
+			if err := publishToChannels(a, postID, pf.channelIDs, pf.area, pf.fullScreen); err != nil {
 				return err
 			}
 
@@ -680,8 +571,6 @@ func newPostsCreatePosterCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
 	cmd.Flags().StringVar(&sourceID, "source-id", "", "Network poster template ID to duplicate")
 	cmd.Flags().IntVar(&colorPaletteID, "color-palette-id", 0, "Color palette ID to apply to the poster")
-	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
-	cmd.Flags().StringVar(&area, "area", "", "Channel area for publication")
-	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen")
+	addPublishFlags(cmd, &pf)
 	return cmd
 }
