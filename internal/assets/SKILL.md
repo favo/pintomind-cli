@@ -526,7 +526,7 @@ pintomind font-families delete <id> --force
 
 Font types:
 - `remote_css` — references a hosted CSS file. Required: `--url`. Optional: `--font-name` (picked from CSS if omitted).
-- `uploaded` — attaches `.ttf`/`.otf`/`.woff`/`.woff2` files via `signed_id`s from `POST /api/v1/direct_uploads`. Required: `--font-normal`, `--font-bold`. Optional: `--font-italic`, `--font-bold-italic`.
+- `uploaded` — uploads `.ttf`/`.otf`/`.woff`/`.woff2` files as multipart/form-data. Required: `--font-normal`, `--font-bold`. Optional: `--font-italic`, `--font-bold-italic`.
 - `standard` — system fonts, read-only (cannot be created or deleted).
 
 Deleting a font resets themes using it to the system default (`figtree`).

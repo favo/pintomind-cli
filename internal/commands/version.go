@@ -47,8 +47,11 @@ func NewVersionCmd(version string) *cobra.Command {
 }
 
 func latestGitHubRelease(owner, repo string) (string, error) {
+	return latestGitHubReleaseWithClient(owner, repo, &http.Client{Timeout: 10 * time.Second})
+}
+
+func latestGitHubReleaseWithClient(owner, repo string, client *http.Client) (string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
-	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
 		return "", err

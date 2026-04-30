@@ -24,8 +24,12 @@ func NewRootCmd() *cobra.Command {
 		Short:   "CLI for the Pintomind / Infoskjermen API",
 		Version: version,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			// Skip app setup for config subcommands (no API client needed)
-			if isConfigCmd(cmd) {
+			// Check for updates on every command except `update` itself
+			if !isUpdateCmd(cmd) {
+				commands.CheckForUpdate(version)
+			}
+			// Skip API client setup for config/update subcommands
+			if isConfigCmd(cmd) || isUpdateCmd(cmd) {
 				return nil
 			}
 
@@ -59,6 +63,7 @@ func NewRootCmd() *cobra.Command {
 
 	root.AddCommand(commands.NewAPICmd())
 	root.AddCommand(commands.NewVersionCmd(version))
+	root.AddCommand(commands.NewUpdateCmd(version))
 	root.AddCommand(commands.NewSetupCmd(root))
 	root.AddCommand(commands.NewConfigCmd())
 	root.AddCommand(commands.NewMeCmd())
@@ -99,4 +104,8 @@ func isConfigCmd(cmd *cobra.Command) bool {
 		c = c.Parent()
 	}
 	return false
+}
+
+func isUpdateCmd(cmd *cobra.Command) bool {
+	return cmd.Name() == "update"
 }
