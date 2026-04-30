@@ -54,54 +54,54 @@ pintomind setup completion   # install shell tab-completion
 
 ---
 
-## Configuration
+## Connections
 
-Config is stored in `~/.config/pintomind/config.json`. You can add multiple accounts with separate API keys — useful for keeping production and development environments apart.
+Config is stored in `~/.config/pintomind/config.json`. You can add multiple connections with separate API keys — useful for keeping production and development environments apart.
 
-### Add an account
+### Add a connection
 
 ```bash
-pintomind config add app.infoskjermen.no sk-your-key
+pintomind connection add app.infoskjermen.no sk-your-key
 ```
 
-The first account added becomes the default. The base URL defaults to `https://<name>`. Override it with `--url`:
+The first connection added becomes the default. The base URL defaults to `https://<name>`. Override it with `--url`:
 
 ```bash
-pintomind config add develop sk-dev-key --url https://develop.infoskjermen.no
+pintomind connection add develop sk-dev-key --url https://develop.infoskjermen.no
 ```
 
-### Show active account
+### Show active connection
 
 ```bash
-pintomind config show
+pintomind connection show
 ```
 
-### List configured accounts
+### List connections
 
 ```bash
-pintomind config list
+pintomind connection list
 ```
 
 The active default is marked with `*`.
 
-### Switch default account
+### Switch default connection
 
 ```bash
-pintomind config use develop
+pintomind connection use develop
 ```
 
-### Remove an account
+### Remove a connection
 
 ```bash
-pintomind config remove develop
+pintomind connection remove develop
 ```
 
-### Override account per command
+### Override connection per command
 
-Use `--account` to target a specific account without changing the default:
+Use `--connection` to target a specific connection without changing the default:
 
 ```bash
-pintomind --account develop screens list
+pintomind --connection develop screens list
 ```
 
 ---
@@ -110,7 +110,7 @@ pintomind --account develop screens list
 
 | Flag | Description |
 |------|-------------|
-| `--account <name>` | Override active account for this command |
+| `--connection <name>` | Override active connection for this command |
 | `--json` | Output raw JSON (useful for scripting and piping to `jq`) |
 | `--verbose` / `-v` | Print HTTP request URL and response status to stderr |
 

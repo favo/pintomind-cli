@@ -15,7 +15,7 @@ import (
 var version = "dev"
 
 func NewRootCmd() *cobra.Command {
-	var accountOverride string
+	var connectionOverride string
 	var jsonOutput bool
 	var verbose bool
 
@@ -29,7 +29,7 @@ func NewRootCmd() *cobra.Command {
 				commands.CheckForUpdate(version)
 			}
 			// Skip API client setup for config/update subcommands
-			if isConfigCmd(cmd) || isUpdateCmd(cmd) {
+			if isConnectionCmd(cmd) || isUpdateCmd(cmd) {
 				return nil
 			}
 
@@ -38,7 +38,7 @@ func NewRootCmd() *cobra.Command {
 				return err
 			}
 
-			domainName, domain, err := cfg.ActiveDomain(accountOverride)
+			domainName, domain, err := cfg.ActiveDomain(connectionOverride)
 			if err != nil {
 				return err
 			}
@@ -46,9 +46,9 @@ func NewRootCmd() *cobra.Command {
 			client := api.New(domain.BaseURL, domain.APIKey)
 			client.Verbose = verbose
 			app := &appctx.App{
-				Config:        cfg,
-				Client:        client,
-				ActiveAccount: domainName,
+				Config:            cfg,
+				Client:            client,
+				ActiveConnection: domainName,
 				JSONOutput:    jsonOutput,
 				Verbose:       verbose,
 			}
@@ -57,7 +57,7 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().StringVar(&accountOverride, "account", "", "Override active account")
+	root.PersistentFlags().StringVar(&connectionOverride, "connection", "", "Override active connection")
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show HTTP request and response details")
 
@@ -66,7 +66,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(commands.NewUpdateCmd(version))
 	root.AddCommand(commands.NewPublishCmd())
 	root.AddCommand(commands.NewSetupCmd(root))
-	root.AddCommand(commands.NewConfigCmd())
+	root.AddCommand(commands.NewConnectionCmd())
 	root.AddCommand(commands.NewMeCmd())
 	root.AddCommand(commands.NewNetworkCmd())
 	root.AddCommand(commands.NewScreensCmd())
@@ -96,11 +96,11 @@ func Execute() {
 	}
 }
 
-// isConfigCmd returns true when cmd is or lives under the "config" command.
-func isConfigCmd(cmd *cobra.Command) bool {
+// isConnectionCmd returns true when cmd is or lives under the "connection" command.
+func isConnectionCmd(cmd *cobra.Command) bool {
 	c := cmd
 	for c != nil {
-		if c.Name() == "config" {
+		if c.Name() == "connection" {
 			return true
 		}
 		c = c.Parent()

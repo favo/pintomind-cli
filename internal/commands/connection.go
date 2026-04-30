@@ -8,10 +8,10 @@ import (
 	"favo/pintomind-cli/internal/config"
 )
 
-func NewConfigCmd() *cobra.Command {
+func NewConnectionCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "config",
-		Short: "Manage accounts and configuration",
+		Use:   "connection",
+		Short: "Manage connections",
 	}
 	cmd.AddCommand(newConfigAddCmd())
 	cmd.AddCommand(newConfigRemoveCmd())
@@ -26,11 +26,11 @@ func newConfigAddCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "add <name> <api-key>",
-		Short: "Add an account with its API key",
+		Short: "Add a connection",
 		Args:  cobra.ExactArgs(2),
-		Example: `  pintomind config add app.infoskjermen.no sk-xxx
-  pintomind config add develop sk-dev --url https://develop.infoskjermen.no
-  pintomind config use develop`,
+		Example: `  pintomind connection add app.infoskjermen.no sk-xxx
+  pintomind connection add develop sk-dev --url https://develop.infoskjermen.no
+  pintomind connection use develop`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			apiKey := args[1]
@@ -57,9 +57,9 @@ func newConfigAddCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Added account %q (%s)\n", name, url)
+			fmt.Printf("Added connection %q (%s)\n", name, url)
 			if cfg.DefaultDomain == name {
-				fmt.Println("Set as default account.")
+				fmt.Println("Set as default connection.")
 			}
 			return nil
 		},
@@ -72,7 +72,7 @@ func newConfigAddCmd() *cobra.Command {
 func newConfigRemoveCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove <name>",
-		Short: "Remove an account from config",
+		Short: "Remove a connection",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
@@ -81,7 +81,7 @@ func newConfigRemoveCmd() *cobra.Command {
 				return err
 			}
 			if _, ok := cfg.Domains[name]; !ok {
-				return fmt.Errorf("account %q not found", name)
+				return fmt.Errorf("connection %q not found", name)
 			}
 			delete(cfg.Domains, name)
 			if cfg.DefaultDomain == name {
@@ -90,7 +90,7 @@ func newConfigRemoveCmd() *cobra.Command {
 			if err := cfg.Save(); err != nil {
 				return err
 			}
-			fmt.Printf("Removed account %q\n", name)
+			fmt.Printf("Removed connection %q\n", name)
 			return nil
 		},
 	}
@@ -99,14 +99,14 @@ func newConfigRemoveCmd() *cobra.Command {
 func newConfigListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "List configured accounts",
+		Short: "List connections",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
 			}
 			if len(cfg.Domains) == 0 {
-				fmt.Println("No accounts configured. Run: pintomind config add app.infoskjermen.no <api-key>")
+				fmt.Println("No connections configured. Run: pintomind connection add app.infoskjermen.no <api-key>")
 				return nil
 			}
 			for name, d := range cfg.Domains {
@@ -124,7 +124,7 @@ func newConfigListCmd() *cobra.Command {
 func newConfigUseCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "use <name>",
-		Short: "Set the default account",
+		Short: "Set the default connection",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
@@ -133,13 +133,13 @@ func newConfigUseCmd() *cobra.Command {
 				return err
 			}
 			if _, ok := cfg.Domains[name]; !ok {
-				return fmt.Errorf("account %q not found — add it first with: pintomind config add %s <api-key>", name, name)
+				return fmt.Errorf("connection %q not found — add it first with: pintomind connection add %s <api-key>", name, name)
 			}
 			cfg.DefaultDomain = name
 			if err := cfg.Save(); err != nil {
 				return err
 			}
-			fmt.Printf("Default account set to %q\n", name)
+			fmt.Printf("Default connection set to %q\n", name)
 			return nil
 		},
 	}
@@ -148,18 +148,18 @@ func newConfigUseCmd() *cobra.Command {
 func newConfigShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show",
-		Short: "Show the active account and its configuration",
+		Short: "Show the active connection",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
 			}
-			accountOverride, _ := cmd.Root().PersistentFlags().GetString("account")
-			name, domain, err := cfg.ActiveDomain(accountOverride)
+			connectionOverride, _ := cmd.Root().PersistentFlags().GetString("connection")
+			name, domain, err := cfg.ActiveDomain(connectionOverride)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Account: %s\n", name)
+			fmt.Printf("Connection: %s\n", name)
 			fmt.Printf("URL:     %s\n", domain.BaseURL)
 			masked := domain.APIKey
 			if len(masked) > 8 {

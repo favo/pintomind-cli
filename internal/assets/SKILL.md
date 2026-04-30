@@ -7,19 +7,19 @@ You are an expert at using the `pintomind` CLI to interact with the Pintomind / 
 
 ## Setup
 
-Config is stored in `~/.config/pintomind/config.json`. Multiple accounts are supported.
+Config is stored in `~/.config/pintomind/config.json`. Multiple connections are supported.
 
 ```bash
-pintomind config add app.infoskjermen.no sk-xxx
-pintomind config add develop sk-dev --url https://develop.infoskjermen.no
-pintomind config use develop
-pintomind config list
-pintomind config show   # show active account and masked API key
+pintomind connection add app.infoskjermen.no sk-xxx
+pintomind connection add develop sk-dev --url https://develop.infoskjermen.no
+pintomind connection use develop
+pintomind connection list
+pintomind connection show   # show active connection and masked API key
 ```
 
 ## Global Flags
 
-- `--account <name>` — override active account for a single command
+- `--connection <name>` — override active connection for a single command
 - `--json` — output raw JSON
 - `--verbose` / `-v` — print HTTP request URL and response status to stderr
 
@@ -649,5 +649,5 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Publishing is separate from raw `posts create`: use `posts publish <post-id> <channel-id>` or pass `--channel-id` to helper subcommands
 - Image and video posts use `media_resources:[{"media_id":...}]`, not `resource_ids`
 - Post fields are always flat inside `post` — no `options` sub-object
-- Use `--account develop` to target the dev environment without changing your default.
+- Use `--connection develop` to target the dev environment without changing your default.
 - Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens) are required for posts and channel posts.

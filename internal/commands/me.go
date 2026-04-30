@@ -9,7 +9,7 @@ import (
 func NewMeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "me",
-		Short: "Show current token identity and account context",
+		Short: "Show current token identity and connection context",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			var result map[string]any
@@ -20,7 +20,7 @@ func NewMeCmd() *cobra.Command {
 				printJSON(result)
 				return nil
 			}
-			fmt.Printf("Account: %s\n", a.ActiveAccount)
+			fmt.Printf("Connection: %s\n", a.ActiveConnection)
 			if user, ok := result["user"].(map[string]any); ok {
 				fmt.Printf("User:    %v\n", user["email"])
 			}
