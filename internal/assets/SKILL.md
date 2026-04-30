@@ -137,9 +137,9 @@ Resource schema keys: `calendar`, `calendar_events`, `entur`, `external_image`, 
 
 Post schema keys: `post_plain`, `post_image`, `post_video`, `post_youtube`, `post_iframe`, `post_calendar`, `post_clock`, `post_world_clock`, `post_counter`, `post_forecast`, `post_feed`, `post_entur`, `post_power_price`, `post_poster`.
 
-Reference keys: `grid_templates` — catalog of named grid layouts used by `post_plain` variation.
-
 Media box schema keys: `media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, `media_box_unsplash`, `media_box_qr_code`.
+
+Theme/palette/font schema keys: `theme`, `color_palette`, `font_family_remote_css`, `font_family_uploaded`.
 
 ## Media Collections
 
@@ -148,7 +148,9 @@ pintomind media-collections list
 pintomind media-collections list --sort-by title
 pintomind media-collections show <id>
 pintomind media-collections create --title "Campaign photos" --category image
+pintomind media-collections create --title "Logos" --category logo --icon "star"
 pintomind media-collections update <id> --title "Updated title"
+pintomind media-collections update <id> --icon "heart"
 pintomind media-collections delete <id>
 pintomind media-collections delete <id> --force
 ```
@@ -437,14 +439,22 @@ Removing a box ID from a plain post update deletes the orphaned box. For poster 
 
 | Type | Required fields | Key optional fields |
 |---|---|---|
-| `media` | `media_id` (integer — ID from media library) | `background_size` (`"cover"`/`"contain"`, default `"cover"`), `x`, `y` (0–1 focal point, default `0.5`) |
+| `media` | `media_id` (integer — ID from media library) | `background_size` (`"cover"`/`"contain"`, default `"cover"`), `x`, `y` (0–1 focal point, default `0.5`), `background_fill_type`, `relative_size` |
 | `icon` | `icon_name` (string) | `icon_type`, `relative_size` (default `0.9`) |
 | `emoji` | `emoji` (Unicode character, e.g. `"🎂"`) | `relative_size` (default `0.9`) |
-| `gif` | `gif_id` (URL and metadata auto-fetched from Giphy) | `background_size`, `x`, `y` |
-| `unsplash` | `photo_id` (URL and author data auto-fetched from Unsplash) | `background_size` (default `"cover"`), `x`, `y` |
+| `gif` | `gif_id` (URL and metadata auto-fetched from Giphy) | `background_size`, `x`, `y`, `background_fill_type` |
+| `unsplash` | `photo_id` (URL and author data auto-fetched from Unsplash) | `background_size` (default `"cover"`), `x`, `y`, `background_fill_type` |
 | `qr_code` | `url` (URL to encode) | `relative_size` (default `0.9`) |
 
 Inspect exact fields with `pintomind schemas show media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, `media_box_unsplash`, or `media_box_qr_code`.
+
+## Icons
+
+```bash
+pintomind icons   # lists available icon names, types, and categories for icon media boxes
+```
+
+Scope: `media_boxes:read`. Returns `{ names: [...], types: [...], categories: [...] }`. Use `icon_name` values here with `pintomind media-boxes create --type icon`.
 
 ## Themes
 
@@ -454,17 +464,17 @@ pintomind themes list --sort-by name
 pintomind themes list --page 2 --per-page 50
 pintomind themes show <id>
 pintomind themes stats
-pintomind themes create --data '{"name":"My theme","font_family_header_id":1,"font_family_body_id":2}'
-pintomind themes create --data '{"name":"Brand theme","font_family_header_id":1,"font_family_body_id":2,"color_palette_id":3}'
-pintomind themes create --type modern --data '{"name":"Modern","font_family_header_id":1,"font_family_body_id":2,"variation":"clean"}'
+pintomind themes create --data '{"name":"My theme","background_color":"#1a1a2e","text_color":"#ffffff"}'
+pintomind themes create --data '{"name":"Brand theme","background_color":"#1a1a2e","text_color":"#ffffff","font_family_header_id":1,"font_family_body_id":2,"color_palette_id":3}'
+pintomind themes create --type modern --data '{"name":"Modern","background_color":"#ffffff","text_color":"#111111","variation":"clean"}'
 pintomind themes update <id> --data '{"name":"Updated name"}'
 pintomind themes update <id> --data '{"color_palette_id":5}'
 pintomind themes delete <id>
 pintomind themes delete <id> --force
 ```
 
-Required fields for `create`: `name`, `font_family_header_id`, `font_family_body_id`.
-Optional: `color_palette_id`, `variation`, `areas`, and any flat layout/background/text properties.
+Required fields for `create`: `name`, `background_color`, `text_color`.
+Optional: `font_family_header_id`, `font_family_body_id`, `color_palette_id`, `variation`, `areas`, and any flat layout/background/text properties.
 Deleting a theme resets channels using it to the account's standard theme.
 
 ## Color Palettes
@@ -501,12 +511,12 @@ pintomind font-families stats
 pintomind font-families create --type remote_css --name "Inter" \
   --url "https://fonts.googleapis.com/css2?family=Inter:wght@400;700"
 
-# Uploaded font — signed_ids from 'pintomind media upload' / direct_uploads
+# Uploaded font — pass local file paths (.ttf/.otf/.woff/.woff2)
 pintomind font-families create --type uploaded --name "MyFont" \
-  --font-normal <signed_id> --font-bold <signed_id>
+  --font-normal ./MyFont-Regular.ttf --font-bold ./MyFont-Bold.ttf
 pintomind font-families create --type uploaded --name "MyFont" \
-  --font-normal <signed_id> --font-bold <signed_id> \
-  --font-italic <signed_id> --font-bold-italic <signed_id>
+  --font-normal ./MyFont-Regular.ttf --font-bold ./MyFont-Bold.ttf \
+  --font-italic ./MyFont-Italic.ttf --font-bold-italic ./MyFont-BoldItalic.ttf
 
 pintomind font-families update <id> --name "Renamed"
 pintomind font-families update <id> --suitable-for-body
