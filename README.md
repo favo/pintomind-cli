@@ -26,11 +26,12 @@ cd pintomind-cli
 make install
 ```
 
-### Verify
+### Verify and update
 
 ```bash
 pintomind version
 pintomind version --check   # check for a newer release on GitHub
+pintomind update            # self-update to the latest release
 ```
 
 ---
@@ -116,6 +117,19 @@ pintomind --account develop screens list
 ---
 
 ## Commands
+
+### Quick publish
+
+Upload a file or URL and immediately publish it as an image post to one or more channels:
+
+```bash
+pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
+pintomind publish https://example.com/banner.jpg --channel-id 7 --channel-id 8
+pintomind publish ./photo.jpg --channel-id 7 --duration 10 --full-screen
+pintomind publish ./photo.jpg --channel-id 7 --media-collection 42  # specific collection
+```
+
+The CLI uploads the file, waits for processing, creates the image post, and publishes it — all in one command.
 
 ### Identity
 
@@ -210,28 +224,109 @@ pintomind channels set-theme <channel-id> <theme-id>
 pintomind channels set-theme --all <theme-id>   # Apply to all channels
 ```
 
+### Posts
+
+```bash
+pintomind posts list
+pintomind posts list --type image
+pintomind posts list --type feed,calendar   # comma-separated types
+pintomind posts list --archived
+pintomind posts list --sort-by created_at:desc
+pintomind posts show <id>
+pintomind posts update <id> --data '{"name":"Updated name"}'
+pintomind posts delete <id>
+pintomind posts delete <id> --force
+```
+
+**Create posts with typed subcommands:**
+
+Each subcommand accepts `--channel-id` (repeatable), `--area`, and `--full-screen` to publish immediately after creation.
+
+```bash
+# Image post — upload files and/or reference existing media IDs
+pintomind posts create image --name "Gallery" --image ./a.jpg --image ./b.jpg --channel-id 7
+pintomind posts create image --name "Promo" --media 42 --media 43 --duration 10
+pintomind posts create image --name "Mix" --image ./photo.jpg --media 55 --channel-id 7
+pintomind posts create image --image ./deck.pdf  # PDF is auto-extracted into pages
+
+# Plain text post
+pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
+pintomind posts create plain --name "Msg" --body "<p>Content</p>" --justification center --fontsize large
+
+# Feed post (creates an RSS/Atom resource automatically)
+pintomind posts create feed --name "News" --url https://rss.example.com --channel-id 7
+
+# Calendar post (creates a calendar resource from an iCal/WebCal URL automatically)
+pintomind posts create calendar --name "Events" --url https://calendar.example.com/feed.ics --channel-id 7
+
+# Iframe post — embed a webpage, raw HTML, or a remote image
+pintomind posts create iframe --name "Dashboard" --url https://dashboard.example.com --channel-id 7
+pintomind posts create iframe --name "Announcement" --html "<h1>Hello world</h1>" --channel-id 7
+pintomind posts create iframe --name "Banner" --image https://example.com/banner.png --channel-id 7
+
+# HTML shortcut — iframe post displaying inline HTML (same as iframe --html)
+pintomind posts create html --name "Notice" --html "<h1>Closed today</h1>" --channel-id 7
+
+# Poster post
+pintomind posts create poster --name "Spring campaign" --source-id <template-id> --channel-id 7
+pintomind posts create poster --name "Brand poster" --source-id <template-id> --color-palette-id 5
+```
+
+**Raw create (any type, full JSON control):**
+
+```bash
+pintomind posts create --type image --data '{"name":"Spring","duration_per_item":7,"media_resources":[{"media_id":42}]}'
+pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","body":"<p>World</p>","media_box_ids":[201,202]}'
+pintomind posts create --type poster --source-id <template-id> --data '{"name":"My poster"}'
+```
+
+**Publications — manage where a post is displayed:**
+
+```bash
+pintomind posts publications <post-id>          # List a post's channel publications
+pintomind posts publish <post-id> <channel-id>  # Publish to a channel
+pintomind posts publish <post-id> <channel-id> --area F11
+pintomind posts publish <post-id> <channel-id> --full-screen
+pintomind posts unpublish <post-id> <publication-id>
+pintomind posts unpublish <post-id> <publication-id> --force
+```
+
 ### Resources
 
 ```bash
 pintomind resources list
-pintomind resources list --type text_slide
-pintomind resources list --type text_slide,calendar_events   # comma-separated types
+pintomind resources list --type feed
+pintomind resources list --type feed,calendar   # comma-separated types
 pintomind resources list --page 2 --per-page 50
 pintomind resources show <id>
 pintomind resources stats
 pintomind resources refresh <id>         # For external resources only
 ```
 
-**Create a resource:**
+**Create resources with typed subcommands:**
 
 ```bash
-pintomind resources create --type text_slide --data '{"title":"Hello","body":"World"}'
+pintomind resources create text --label "Greeting" --text "Hello world"
+pintomind resources create feed --url https://rss.example.com --title "News"
+pintomind resources create calendar --url https://calendar.example.com/feed.ics --color "#FF5733"
+pintomind resources create external-webpage --url https://example.com
+pintomind resources create external-image --url https://example.com/banner.png
+pintomind resources create qr-code --url https://example.com --label-text "Scan me"
+pintomind resources create html --html-code "<h1>Hello</h1>" --title "Notice"
+pintomind resources create location --name "Oslo" --lat 59.9139 --lon 10.7522 --country-code NO --timezone Europe/Oslo
+pintomind resources create youtube --url "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
+**Raw create (any type, full JSON control):**
+
+```bash
+pintomind resources create --type text --data '{"label":"Hello","text":"World"}'
 ```
 
 **Update a resource:**
 
 ```bash
-pintomind resources update <id> --data '{"title":"Updated title"}'
+pintomind resources update <id> --data '{"label":"Updated label"}'
 ```
 
 **Append items** (for resource types that support it):
@@ -274,7 +369,7 @@ pintomind media delete <id>
 pintomind media delete <id> --force
 ```
 
-**Upload a file** (the CLI handles checksum, direct upload, and media creation):
+**Upload a file** (the CLI handles checksum, direct upload, and media record creation):
 
 ```bash
 pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"
@@ -282,11 +377,29 @@ pintomind media upload <collection-id> https://example.com/photo.jpg --name "Lob
 pintomind media upload <collection-id> ./deck.pdf --extract-pages
 ```
 
+Uploads return a task immediately (`202 Accepted`). Use `--wait` to block until processing finishes and print the resulting media IDs:
+
+```bash
+pintomind media upload <collection-id> ./deck.pdf --extract-pages --wait
+```
+
 For advanced flows, claim an already-created direct upload signed ID:
 
 ```bash
 pintomind media create <collection-id> --source <signed-id> --name "Uploaded file"
+pintomind media create <collection-id> --source <signed-id> --extract-pages --wait
 ```
+
+### Tasks
+
+Media uploads are processed asynchronously. `pintomind publish` and `posts create image` wait automatically. For raw uploads (`media upload` / `media create` without `--wait`), inspect or wait for the task manually:
+
+```bash
+pintomind tasks show <id>    # Current state: pending / processing / completed / failed
+pintomind tasks wait <id>    # Block until done, print resulting media IDs
+```
+
+Task responses include `id`, `status`, `progress` (0–100), `result.media_ids`, and `error`.
 
 ### Poster Templates
 
@@ -302,10 +415,11 @@ pintomind poster-templates show <id>   # includes raw_poster_data
 
 Poster posts are backed by a `PosterPageResource` that holds the design data.
 
-**Create from a network template:**
+**Create from a network template (easiest):**
 
 ```bash
-pintomind posts create --type poster --source-id <template-id> --data '{"name":"My Poster"}'
+pintomind posts create poster --name "Spring campaign" --source-id <template-id> --channel-id 7
+pintomind posts create poster --name "Brand poster" --source-id <template-id> --color-palette-id 5
 ```
 
 **Create from scratch:**
@@ -358,6 +472,13 @@ pintomind posts create --type plain --data '{
 
 Media box types: `media` (requires `media_id`), `icon` (requires `icon_name`, usually `icon_type`), `emoji` (requires `emoji`), `gif` (requires `gif_id`, `gif_url`), `unsplash` (requires `photo_url`). Inspect exact fields with `pintomind schemas show media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, or `media_box_unsplash`.
 
+Browse available icon names:
+
+```bash
+pintomind icons
+pintomind icons --json | jq '[.[] | select(.category == "communication")]'
+```
+
 ### Schemas
 
 Inspect the API schema for resource types (useful for knowing which fields are valid in `--data`):
@@ -365,6 +486,9 @@ Inspect the API schema for resource types (useful for knowing which fields are v
 ```bash
 pintomind schemas list
 pintomind schemas show <id>
+pintomind schemas show text
+pintomind schemas show feed
+pintomind schemas show calendar
 ```
 
 ### Themes
@@ -374,6 +498,28 @@ pintomind themes list
 pintomind themes list --page 2
 pintomind themes show <id>
 pintomind themes stats
+```
+
+### Color Palettes
+
+```bash
+pintomind color-palettes list   # alias: pintomind palettes list
+pintomind color-palettes show <id>
+pintomind color-palettes create --data '{"name":"Brand","colors":["#FF0000","#00FF00"]}'
+pintomind color-palettes update <id> --data '{"name":"Brand v2"}'
+pintomind color-palettes delete <id>
+pintomind color-palettes stats
+```
+
+### Font Families
+
+```bash
+pintomind font-families list   # alias: pintomind fonts list
+pintomind font-families show <id>
+pintomind font-families create --data '{"name":"My Font","font_type":"google","font_family":"Inter"}'
+pintomind font-families update <id> --data '{"name":"Updated name"}'
+pintomind font-families delete <id>
+pintomind font-families stats
 ```
 
 ### Raw API access
@@ -452,10 +598,17 @@ Set a theme on every channel:
 pintomind channels set-theme --all 5
 ```
 
-Inspect valid fields for `text_slide` resources:
+Upload a PDF, wait for page extraction, then create an image post from all pages:
 
 ```bash
-pintomind schemas show text_slide
+pintomind posts create image --image ./brochure.pdf --name "Brochure" --channel-id 7
+```
+
+Inspect valid fields for a resource type:
+
+```bash
+pintomind schemas show text
+pintomind schemas show location
 ```
 
 ---

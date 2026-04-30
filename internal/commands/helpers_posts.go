@@ -39,14 +39,15 @@ func findDefaultCollection(a *appctx.App, category string) (int, error) {
 	return 0, fmt.Errorf("no default %s media collection found; use --media-collection to specify one", category)
 }
 
-// uploadFileToCollection uploads a local file or URL and returns the created media ID.
-func uploadFileToCollection(a *appctx.App, input, collectionID string) (int, error) {
+// uploadFileToCollection uploads a local file or URL, waits for the processing task,
+// and returns the resulting media IDs (multiple when a PDF is extracted into pages).
+func uploadFileToCollection(a *appctx.App, input, collectionID string) ([]int, error) {
 	if !a.JSONOutput && isHTTPURL(input) {
 		fmt.Fprintf(os.Stderr, "Downloading %s...\n", input)
 	}
 	source, err := prepareUploadSource(input, "", a.Client.HTTPClient)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer source.Close()
 
@@ -63,15 +64,15 @@ func uploadFileToCollection(a *appctx.App, input, collectionID string) (int, err
 			"checksum":     source.metadata.checksum,
 		},
 	}, &upload); err != nil {
-		return 0, err
+		return nil, err
 	}
 	if upload.SignedID == "" || upload.DirectUpload.URL == "" {
-		return 0, fmt.Errorf("direct upload response missing signed_id or upload URL")
+		return nil, fmt.Errorf("direct upload response missing signed_id or upload URL")
 	}
 
 	file, err := os.Open(source.path)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer file.Close()
 
@@ -79,16 +80,19 @@ func uploadFileToCollection(a *appctx.App, input, collectionID string) (int, err
 		fmt.Fprintf(os.Stderr, "Uploading %s...\n", source.metadata.filename)
 	}
 	if err := a.Client.PutDirectUpload(upload.DirectUpload.URL, upload.DirectUpload.Headers, file, source.metadata.byteSize); err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	var mediaResp map[string]any
+	var taskResp TaskResponse
 	if err := a.Client.Post("/media_collections/"+collectionID+"/media", map[string]any{
 		"media": map[string]any{"source": upload.SignedID},
-	}, &mediaResp); err != nil {
-		return 0, err
+	}, &taskResp); err != nil {
+		return nil, err
 	}
-	return intFromNestedResp(mediaResp, "media", "id")
+	if !a.JSONOutput {
+		fmt.Fprintf(os.Stderr, "Processing task %d...\n", taskResp.Task.ID)
+	}
+	return waitForTask(a, taskResp.Task.ID)
 }
 
 // createResource creates a resource and returns its ID.
@@ -252,7 +256,7 @@ func NewPublishCmd() *cobra.Command {
 				colID = id
 			}
 
-			mediaID, err := uploadFileToCollection(a, input, strconv.Itoa(colID))
+			uploadedIDs, err := uploadFileToCollection(a, input, strconv.Itoa(colID))
 			if err != nil {
 				return err
 			}
@@ -262,7 +266,7 @@ func NewPublishCmd() *cobra.Command {
 				postName = filepath.Base(input)
 			}
 
-			return createAndPublishImagePost(a, postName, []int{mediaID}, duration, pf)
+			return createAndPublishImagePost(a, postName, uploadedIDs, duration, pf)
 		},
 	}
 
@@ -308,11 +312,11 @@ func newPostsCreateImageCmd() *cobra.Command {
 				}
 				colIDStr := strconv.Itoa(colID)
 				for _, img := range images {
-					mID, err := uploadFileToCollection(a, img, colIDStr)
+					ids, err := uploadFileToCollection(a, img, colIDStr)
 					if err != nil {
 						return err
 					}
-					allMediaIDs = append(allMediaIDs, mID)
+					allMediaIDs = append(allMediaIDs, ids...)
 				}
 			}
 			allMediaIDs = append(allMediaIDs, mediaIDs...)

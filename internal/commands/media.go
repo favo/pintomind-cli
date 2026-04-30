@@ -329,14 +329,14 @@ func newMediaListCmd() *cobra.Command {
 
 func newMediaUploadCmd() *cobra.Command {
 	var name, description, contentType string
-	var extractPages bool
+	var extractPages, wait bool
 
 	cmd := &cobra.Command{
 		Use:   "upload <collection-id> <file-or-url>",
 		Short: "Upload a file or URL to a media collection",
 		Example: `  pintomind media upload 42 ./cat.jpg --name "Cat photo"
   pintomind media upload 42 https://example.com/cat.jpg --name "Cat photo"
-  pintomind media upload 42 ./deck.pdf --extract-pages`,
+  pintomind media upload 42 ./deck.pdf --extract-pages --wait`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
@@ -397,16 +397,27 @@ func newMediaUploadCmd() *cobra.Command {
 				claimBody["extract_pages"] = true
 			}
 
-			var resp map[string]any
-			if err := a.Client.Post("/media_collections/"+collectionID+"/media", claimBody, &resp); err != nil {
+			var taskResp TaskResponse
+			if err := a.Client.Post("/media_collections/"+collectionID+"/media", claimBody, &taskResp); err != nil {
+				return err
+			}
+
+			if !wait {
+				printJSON(taskResp)
+				return nil
+			}
+
+			if !a.JSONOutput {
+				fmt.Fprintf(os.Stderr, "Processing task %d...\n", taskResp.Task.ID)
+			}
+			mediaIDs, err := waitForTask(a, taskResp.Task.ID)
+			if err != nil {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
-			} else if media, ok := resp["media"].(map[string]any); ok {
-				fmt.Printf("Uploaded media %v: %v\n", media["id"], firstNonEmpty(fmt.Sprint(media["name"]), source.metadata.filename))
+				printJSON(map[string]any{"media_ids": mediaIDs})
 			} else {
-				printJSON(resp)
+				fmt.Printf("Uploaded. Media IDs: %v\n", mediaIDs)
 			}
 			return nil
 		},
@@ -415,12 +426,13 @@ func newMediaUploadCmd() *cobra.Command {
 	cmd.Flags().StringVar(&description, "description", "", "Media description")
 	cmd.Flags().StringVar(&contentType, "content-type", "", "Override detected MIME content type")
 	cmd.Flags().BoolVar(&extractPages, "extract-pages", false, "Extract pages from an uploaded PDF")
+	cmd.Flags().BoolVar(&wait, "wait", false, "Wait for processing to complete and print media IDs")
 	return cmd
 }
 
 func newMediaCreateCmd() *cobra.Command {
 	var source, name, description string
-	var extractPages bool
+	var extractPages, wait bool
 
 	cmd := &cobra.Command{
 		Use:   "create <collection-id> --source <signed-id>",
@@ -440,11 +452,28 @@ func newMediaCreateCmd() *cobra.Command {
 				body["extract_pages"] = true
 			}
 
-			var resp map[string]any
-			if err := a.Client.Post("/media_collections/"+args[0]+"/media", body, &resp); err != nil {
+			var taskResp TaskResponse
+			if err := a.Client.Post("/media_collections/"+args[0]+"/media", body, &taskResp); err != nil {
 				return err
 			}
-			printJSON(resp)
+
+			if !wait {
+				printJSON(taskResp)
+				return nil
+			}
+
+			if !a.JSONOutput {
+				fmt.Fprintf(os.Stderr, "Processing task %d...\n", taskResp.Task.ID)
+			}
+			mediaIDs, err := waitForTask(a, taskResp.Task.ID)
+			if err != nil {
+				return err
+			}
+			if a.JSONOutput {
+				printJSON(map[string]any{"media_ids": mediaIDs})
+			} else {
+				fmt.Printf("Created. Media IDs: %v\n", mediaIDs)
+			}
 			return nil
 		},
 	}
@@ -452,6 +481,7 @@ func newMediaCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Media name")
 	cmd.Flags().StringVar(&description, "description", "", "Media description")
 	cmd.Flags().BoolVar(&extractPages, "extract-pages", false, "Extract pages from an uploaded PDF")
+	cmd.Flags().BoolVar(&wait, "wait", false, "Wait for processing to complete and print media IDs")
 	_ = cmd.MarkFlagRequired("source")
 	return cmd
 }
