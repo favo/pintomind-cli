@@ -107,6 +107,6 @@ func waitForTask(a *appctx.App, taskID int) ([]int, error) {
 		if !a.JSONOutput && resp.Task.Progress > 0 {
 			fmt.Fprintf(os.Stderr, "\033[2K\rProcessing... %d%%", resp.Task.Progress)
 		}
-		time.Sleep(time.Second)
+		time.Sleep(5 * time.Second)
 	}
 }
