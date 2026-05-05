@@ -300,20 +300,20 @@ pintomind schemas show post_calendar
 Common shared fields: `name`, `title`, `duration`, `show_title`, `area`.
 
 ```bash
-# Image post — use media_resources with media_id values from `pintomind media upload`
+# Image post — use images[] with media_id values from `pintomind media upload`
 pintomind posts create --type image --data '{
   "name":"Spring campaign",
   "title":"New collection",
   "duration_per_item":7,
-  "media_resources":[{"media_id":42},{"media_id":43}],
+  "images":[{"media_id":42},{"media_id":43}],
   "aspect_ratio":"fill",
   "grid_layout":1
 }'
 
-# Video post — max 1 item in media_resources
+# Video post — video_media_id is a single integer
 pintomind posts create --type video --data '{
   "name":"Promo",
-  "media_resources":[{"media_id":101}],
+  "video_media_id":101,
   "sound":true
 }'
 
@@ -377,7 +377,7 @@ pintomind posts unpublish <post-id> <publication-id> --force
 pintomind media upload 42 ./photo.jpg --name "Lobby photo" --json | jq '.media.id'
 
 # 2. Create an image post using that media ID
-pintomind posts create --type image --data '{"name":"Lobby","media_resources":[{"media_id":<id>}],"duration_per_item":7}'
+pintomind posts create --type image --data '{"name":"Lobby","images":[{"media_id":<id>}],"duration_per_item":7}'
 
 # 3. Publish it to a channel
 pintomind posts publish <post-id> <channel-id>
@@ -413,19 +413,10 @@ pintomind poster-templates list --json
 # 2. Duplicate a template into a new post owned by the account
 pintomind posts create --type poster --source-id <template-id> --data '{"name":"My Poster"}'
 
-# 3. Update the poster content via inline resources
-pintomind posts update <post-id> --data '{
-  "resources": [{"poster_data": "{\"backgroundFill\":\"#fff\",\"aspectRatio\":\"16/9\",\"templates\":{},\"templateDimensions\":{}}"}]
-}'
+# 3. Update the poster content via the backing resource
+pintomind resources update <resource-id> --data '{"poster_data": "{\"backgroundFill\":\"#fff\",\"aspectRatio\":\"16/9\",\"templates\":{},\"templateDimensions\":{}}"}'
 
-# 4. Or update the backing resource directly
-pintomind resources update <resource-id> --data '{"poster_data": "{\"backgroundFill\":\"#fff\",\"aspectRatio\":\"16/9\"}"}'
-
-# 4b. Attach media boxes to poster nodes (hash of node-position → media_box_id)
-pintomind posts update <post-id> --data '{
-  "resources": [{"media_box_ids": {"hero-image": 201}}]
-}'
-# Or directly on the resource:
+# 4. Attach media boxes to poster nodes (hash of node-position → media_box_id)
 pintomind resources update <resource-id> --data '{"media_box_ids": {"hero-image": 201}}'
 
 # 5. Publish to a channel
@@ -435,38 +426,26 @@ pintomind posts publish <post-id> <channel-id>
 ### Creating a poster from scratch
 
 ```bash
-pintomind posts create --type poster --data '{
-  "name": "Lobby poster",
-  "resources": [{
-    "title": "Lobby poster",
-    "poster_data": "{\"backgroundFill\":\"#ffffff\",\"templateDimensions\":{},\"templates\":{},\"aspectRatio\":\"16/9\",\"metaDescription\":\"Minimalist poster.\"}",
-    "color_palette_id": 123
-  }]
+# Create the post, then update the backing resource
+pintomind posts create --type poster --data '{"name": "Lobby poster"}'
+pintomind resources update <resource-id> --data '{
+  "poster_data": "{\"backgroundFill\":\"#ffffff\",\"templateDimensions\":{},\"templates\":{},\"aspectRatio\":\"16/9\",\"metaDescription\":\"Minimalist poster.\"}",
+  "color_palette_id": 123
 }'
 ```
 
+The post response includes `resource_ids`; use the first ID as `<resource-id>`.
+
 ### Updating poster content
 
-When patching, include `resources[0].id` to update the existing backing resource explicitly. If `id` is omitted the API updates the existing resource automatically (or creates one if the post has none).
-
 ```bash
-# Update via post — without id (auto-targets existing resource)
-pintomind posts update <post-id> --data '{
-  "resources": [{"poster_data": "<json-string>", "color_palette_id": 5}]
-}'
-
-# Update via post — explicit resource id
-pintomind posts update <post-id> --data '{
-  "resources": [{"id": <resource-id>, "poster_data": "<json-string>"}]
-}'
-
-# Update directly on the resource
 pintomind resources update <resource-id> --data '{"poster_data": "<json-string>"}'
+pintomind resources update <resource-id> --data '{"color_palette_id": 5}'
 ```
 
 `poster_data` is a JSON string with top-level keys: `backgroundFill`, `templateDimensions`, `templates`, `aspectRatio`, `metaDescription`.
 
-`poster_page` resources also accept `media_box_ids` (hash) and `color_palette_id`. Both can be updated inline via `post.resources[]` or directly via `resources update`.
+`poster_page` resources also accept `media_box_ids` (hash) and `color_palette_id`. Update them via `resources update`.
 
 **Note:** `poster_page` resources are auto-created by poster posts. Do not create them manually via `resources create`.
 
@@ -504,13 +483,8 @@ pintomind posts create --type plain --data '{
 # Replace attached boxes on an existing plain post
 pintomind posts update <post-id> --data '{"media_box_ids":[203]}'
 
-# Attach boxes to a poster post (hash of node-position → id, via resources)
-pintomind posts update <post-id> --data '{
-  "resources": [{"media_box_ids": {"hero-image": 201, "avatar": 202}}]
-}'
-
-# Attach via poster_page resource directly
-pintomind resources update <resource-id> --data '{"media_box_ids": {"hero-image": 201}}'
+# Attach boxes to a poster post (hash of node-position → id, via poster_page resource)
+pintomind resources update <resource-id> --data '{"media_box_ids": {"hero-image": 201, "avatar": 202}}'
 
 # Remove all poster media boxes
 pintomind resources update <resource-id> --data '{"media_box_ids": {}}'
@@ -547,17 +521,16 @@ pintomind themes list --sort-by name
 pintomind themes list --page 2 --per-page 50
 pintomind themes show <id>
 pintomind themes stats
-pintomind themes create --data '{"name":"My theme","background_color":"#1a1a2e","text_color":"#ffffff"}'
-pintomind themes create --data '{"name":"Brand theme","background_color":"#1a1a2e","text_color":"#ffffff","font_family_header_id":1,"font_family_body_id":2,"color_palette_id":3}'
-pintomind themes create --type modern --data '{"name":"Modern","background_color":"#ffffff","text_color":"#111111","variation":"clean"}'
+pintomind themes create --data '{"name":"My theme","font_family_header_id":1,"font_family_body_id":2,"background_color":"#1a1a2e","text_color":"#ffffff"}'
+pintomind themes create --data '{"name":"Brand theme","font_family_header_id":1,"font_family_body_id":2,"background_color":"#1a1a2e","text_color":"#ffffff","color_palette_id":3}'
 pintomind themes update <id> --data '{"name":"Updated name"}'
 pintomind themes update <id> --data '{"color_palette_id":5}'
 pintomind themes delete <id>
 pintomind themes delete <id> --force
 ```
 
-Required fields for `create`: `name`, `background_color`, `text_color`.
-Optional: `font_family_header_id`, `font_family_body_id`, `color_palette_id`, `variation`, `areas`, and any flat layout/background/text properties.
+Required fields for `create`: `name`, `font_family_header_id`, `font_family_body_id`, `background_color`, `text_color`.
+Optional: `color_palette_id`, `variation`, `areas`, and any flat layout/background/text properties.
 Deleting a theme resets channels using it to the account's standard theme.
 
 ## Color Palettes
@@ -647,7 +620,7 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Inspect valid resource fields: `pintomind schemas show text`
 - Inspect valid post fields: `pintomind schemas show post_image` (prefix `post_`)
 - Publishing is separate from raw `posts create`: use `posts publish <post-id> <channel-id>` or pass `--channel-id` to helper subcommands
-- Image and video posts use `media_resources:[{"media_id":...}]`, not `resource_ids`
+- Image posts use `images:[{"media_id":...}]`; video posts use `video_media_id:<id>` (single integer) — neither uses `resource_ids`
 - Post fields are always flat inside `post` — no `options` sub-object
 - Use `--connection develop` to target the dev environment without changing your default.
 - Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens) are required for posts and channel posts.

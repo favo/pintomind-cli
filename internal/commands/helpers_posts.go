@@ -122,13 +122,13 @@ func createResourceAndPrint(a *appctx.App, resourceType string, data map[string]
 
 // createAndPublishImagePost creates an image post from mediaIDs, then publishes to channels.
 func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, duration int, p publishOpts) error {
-	mediaResources := make([]map[string]any, len(mediaIDs))
+	images := make([]map[string]any, len(mediaIDs))
 	for i, id := range mediaIDs {
-		mediaResources[i] = map[string]any{"media_id": id}
+		images[i] = map[string]any{"media_id": id}
 	}
 	post := map[string]any{
 		"duration_per_item": duration,
-		"media_resources":   mediaResources,
+		"images":            images,
 	}
 	if name != "" {
 		post["name"] = name
@@ -539,9 +539,6 @@ func newPostsCreatePosterCmd() *cobra.Command {
 			if name != "" {
 				post["name"] = name
 			}
-			if cmd.Flags().Changed("color-palette-id") {
-				post["resources"] = []map[string]any{{"color_palette_id": colorPaletteID}}
-			}
 
 			body := map[string]any{"type": "poster", "post": post}
 			if sourceID != "" {
@@ -561,6 +558,22 @@ func newPostsCreatePosterCmd() *cobra.Command {
 				fmt.Printf("Created poster post %d\n", postID)
 			}
 
+			if cmd.Flags().Changed("color-palette-id") {
+				resourceID, err := resourceIDFromPostResp(postResp)
+				if err != nil {
+					return fmt.Errorf("applying color palette: %w", err)
+				}
+				var resourceResp map[string]any
+				if err := a.Client.Patch("/resources/"+strconv.Itoa(resourceID), map[string]any{
+					"resource": map[string]any{"color_palette_id": colorPaletteID},
+				}, &resourceResp); err != nil {
+					return fmt.Errorf("applying color palette to poster resource %d: %w", resourceID, err)
+				}
+				if !a.JSONOutput {
+					fmt.Printf("Applied color palette %d to poster resource %d\n", colorPaletteID, resourceID)
+				}
+			}
+
 			if err := publishToChannels(a, postID, pf.channelIDs, pf.area, pf.fullScreen); err != nil {
 				return err
 			}
@@ -577,4 +590,20 @@ func newPostsCreatePosterCmd() *cobra.Command {
 	cmd.Flags().IntVar(&colorPaletteID, "color-palette-id", 0, "Color palette ID to apply to the poster")
 	addPublishFlags(cmd, &pf)
 	return cmd
+}
+
+func resourceIDFromPostResp(resp map[string]any) (int, error) {
+	post, ok := resp["post"].(map[string]any)
+	if !ok {
+		return 0, fmt.Errorf("unexpected response: missing post object")
+	}
+	ids, ok := post["resource_ids"].([]any)
+	if !ok || len(ids) == 0 {
+		return 0, fmt.Errorf("poster post has no resource_ids in response")
+	}
+	f, ok := ids[0].(float64)
+	if !ok {
+		return 0, fmt.Errorf("resource_ids[0] is not numeric")
+	}
+	return int(f), nil
 }

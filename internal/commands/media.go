@@ -19,8 +19,6 @@ type MediaCollection struct {
 	ID                int    `json:"id"`
 	Title             string `json:"title"`
 	Category          string `json:"category"`
-	Visibility        string `json:"visibility"`
-	Scope             string `json:"scope"`
 	DefaultCollection bool   `json:"default_collection"`
 	MediaType         string `json:"media_type"`
 	Sort              int    `json:"sort"`
@@ -122,11 +120,10 @@ func newMediaCollectionsListCmd() *cobra.Command {
 					c.Title,
 					c.Category,
 					c.MediaType,
-					c.Visibility,
 					defaultCollection,
 				}
 			}
-			printTable(cmd, []string{"ID", "TITLE", "CATEGORY", "TYPE", "VISIBILITY", "DEFAULT"}, rows)
+			printTable(cmd, []string{"ID", "TITLE", "CATEGORY", "TYPE", "DEFAULT"}, rows)
 			return nil
 		},
 	}
@@ -154,7 +151,7 @@ func newMediaCollectionsShowCmd() *cobra.Command {
 }
 
 func newMediaCollectionsCreateCmd() *cobra.Command {
-	var title, category, visibility, scope, icon string
+	var title, category, icon string
 	var sort int
 
 	cmd := &cobra.Command{
@@ -165,12 +162,6 @@ func newMediaCollectionsCreateCmd() *cobra.Command {
 			mediaCollection := map[string]any{
 				"title":    title,
 				"category": category,
-			}
-			if visibility != "" {
-				mediaCollection["visibility"] = visibility
-			}
-			if scope != "" {
-				mediaCollection["scope"] = scope
 			}
 			if icon != "" {
 				mediaCollection["icon"] = icon
@@ -189,8 +180,6 @@ func newMediaCollectionsCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&title, "title", "", "Collection title (required)")
 	cmd.Flags().StringVar(&category, "category", "", "Collection category: background, logo, image, video, or document (required)")
-	cmd.Flags().StringVar(&visibility, "visibility", "", "Collection visibility (typically everyone or restricted)")
-	cmd.Flags().StringVar(&scope, "scope", "", "Collection scope")
 	cmd.Flags().StringVar(&icon, "icon", "", "Collection icon")
 	cmd.Flags().IntVar(&sort, "sort", 0, "Sort position")
 	_ = cmd.MarkFlagRequired("title")
@@ -199,7 +188,7 @@ func newMediaCollectionsCreateCmd() *cobra.Command {
 }
 
 func newMediaCollectionsUpdateCmd() *cobra.Command {
-	var title, category, visibility, scope, icon string
+	var title, category, icon string
 	var sort int
 
 	cmd := &cobra.Command{
@@ -214,12 +203,6 @@ func newMediaCollectionsUpdateCmd() *cobra.Command {
 			}
 			if cmd.Flags().Changed("category") {
 				mediaCollection["category"] = category
-			}
-			if cmd.Flags().Changed("visibility") {
-				mediaCollection["visibility"] = visibility
-			}
-			if cmd.Flags().Changed("scope") {
-				mediaCollection["scope"] = scope
 			}
 			if cmd.Flags().Changed("icon") {
 				mediaCollection["icon"] = icon
@@ -241,8 +224,6 @@ func newMediaCollectionsUpdateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&title, "title", "", "Collection title")
 	cmd.Flags().StringVar(&category, "category", "", "Collection category: background, logo, image, video, or document")
-	cmd.Flags().StringVar(&visibility, "visibility", "", "Collection visibility")
-	cmd.Flags().StringVar(&scope, "scope", "", "Collection scope")
 	cmd.Flags().StringVar(&icon, "icon", "", "Collection icon")
 	cmd.Flags().IntVar(&sort, "sort", 0, "Sort position")
 	return cmd

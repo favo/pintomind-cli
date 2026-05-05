@@ -105,13 +105,12 @@ func newThemesStatsCmd() *cobra.Command {
 }
 
 func newThemesCreateCmd() *cobra.Command {
-	var themeType string
 	var data string
 
 	cmd := &cobra.Command{
 		Use:   "create --data '<json>'",
 		Short: "Create a theme",
-		Example: `  pintomind themes create --data '{"name":"My theme","font_family_header_id":1,"font_family_body_id":2,"color_palette_id":3}'`,
+		Example: `  pintomind themes create --data '{"name":"My theme","font_family_header_id":1,"font_family_body_id":2,"background_color":"#1a1a2e","text_color":"#ffffff"}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			var theme map[string]any
@@ -119,9 +118,6 @@ func newThemesCreateCmd() *cobra.Command {
 				return fmt.Errorf("invalid JSON for --data: %w", err)
 			}
 			body := map[string]any{"theme": theme}
-			if themeType != "" {
-				body["type"] = themeType
-			}
 			var resp map[string]any
 			if err := a.Client.Post("/themes", body, &resp); err != nil {
 				return err
@@ -130,7 +126,6 @@ func newThemesCreateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&themeType, "type", "", "Theme type alias (default: modern)")
 	cmd.Flags().StringVar(&data, "data", "", "Theme attributes as JSON (required)")
 	_ = cmd.MarkFlagRequired("data")
 	return cmd

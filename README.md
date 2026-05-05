@@ -275,7 +275,7 @@ pintomind posts create poster --name "Brand poster" --source-id <template-id> --
 **Raw create (any type, full JSON control):**
 
 ```bash
-pintomind posts create --type image --data '{"name":"Spring","duration_per_item":7,"media_resources":[{"media_id":42}]}'
+pintomind posts create --type image --data '{"name":"Spring","duration_per_item":7,"images":[{"media_id":42}]}'
 pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","body":"<p>World</p>","media_box_ids":[201,202]}'
 pintomind posts create --type poster --source-id <template-id> --data '{"name":"My poster"}'
 ```
@@ -425,19 +425,14 @@ pintomind posts create poster --name "Brand poster" --source-id <template-id> --
 **Create from scratch:**
 
 ```bash
-pintomind posts create --type poster --data '{
-  "name": "Lobby poster",
-  "resources": [{
-    "poster_data": "{\"backgroundFill\":\"#ffffff\",\"templateDimensions\":{},\"templates\":{},\"aspectRatio\":\"16/9\"}",
-    "color_palette_id": 123
-  }]
-}'
+# Create the post, then update the backing resource with poster_data
+pintomind posts create --type poster --data '{"name": "Lobby poster"}'
+pintomind resources update <resource-id> --data '{"poster_data": "{\"backgroundFill\":\"#ffffff\",\"templateDimensions\":{},\"templates\":{},\"aspectRatio\":\"16/9\"}","color_palette_id": 123}'
 ```
 
 **Update poster content:**
 
 ```bash
-pintomind posts update <post-id> --data '{"resources": [{"poster_data": "<json-string>"}]}'
 pintomind resources update <resource-id> --data '{"poster_data": "<json-string>"}'
 ```
 
