@@ -24,7 +24,7 @@ func NewUpdateCmd(version string) *cobra.Command {
 }
 
 func selfUpdate(currentVersion string) error {
-	latest, err := latestGitHubRelease("favo-no", "pintomind-cli")
+	latest, err := latestGitHubRelease("favo", "pintomind-cli")
 	if err != nil {
 		return fmt.Errorf("checking for updates: %w", err)
 	}
@@ -122,7 +122,7 @@ func CheckForUpdate(version string) {
 		latest = strings.TrimSpace(string(data))
 	} else {
 		client := &http.Client{Timeout: 3 * time.Second}
-		latest, err = latestGitHubReleaseWithClient("favo-no", "pintomind-cli", client)
+		latest, err = latestGitHubReleaseWithClient("favo", "pintomind-cli", client)
 		if err != nil {
 			return
 		}
@@ -146,7 +146,7 @@ func invalidateUpdateCache() {
 
 func releaseDownloadURL(tag string) string {
 	return fmt.Sprintf(
-		"https://github.com/favo-no/pintomind-cli/releases/download/%s/pintomind_%s_%s",
+		"https://github.com/favo/pintomind-cli/releases/download/%s/pintomind_%s_%s",
 		tag, runtime.GOOS, runtime.GOARCH,
 	)
 }

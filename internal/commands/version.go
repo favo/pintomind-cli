@@ -20,7 +20,7 @@ func NewVersionCmd(version string) *cobra.Command {
 			if !check {
 				return nil
 			}
-			latest, err := latestGitHubRelease("favo-no", "pintomind-cli")
+			latest, err := latestGitHubRelease("favo", "pintomind-cli")
 			if err != nil {
 				return fmt.Errorf("checking for updates: %w", err)
 			}
@@ -37,7 +37,7 @@ func NewVersionCmd(version string) *cobra.Command {
 			} else {
 				fmt.Printf("A new version is available: %s (you have %s)\n", latest, current)
 				fmt.Println("To upgrade, re-run the install script:")
-				fmt.Println("  curl -fsSL https://raw.githubusercontent.com/favo-no/pintomind-cli/main/install.sh | sh")
+				fmt.Println("  curl -fsSL https://raw.githubusercontent.com/favo/pintomind-cli/main/install.sh | sh")
 			}
 			return nil
 		},

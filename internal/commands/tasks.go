@@ -91,15 +91,21 @@ func waitForTask(a *appctx.App, taskID int) ([]int, error) {
 		}
 		switch resp.Task.Status {
 		case "completed":
+			if !a.JSONOutput {
+				fmt.Fprintf(os.Stderr, "\033[2K\r")
+			}
 			if resp.Task.Result == nil {
 				return nil, fmt.Errorf("task %d completed but returned no result", taskID)
 			}
 			return resp.Task.Result.MediaIDs, nil
 		case "failed":
+			if !a.JSONOutput {
+				fmt.Fprintf(os.Stderr, "\033[2K\r")
+			}
 			return nil, fmt.Errorf("task %d failed: %s", taskID, resp.Task.Error)
 		}
 		if !a.JSONOutput && resp.Task.Progress > 0 {
-			fmt.Fprintf(os.Stderr, "Processing... %d%%\n", resp.Task.Progress)
+			fmt.Fprintf(os.Stderr, "\033[2K\rProcessing... %d%%", resp.Task.Progress)
 		}
 		time.Sleep(time.Second)
 	}
