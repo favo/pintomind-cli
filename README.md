@@ -251,7 +251,7 @@ pintomind posts create image --image ./deck.pdf  # PDF is auto-extracted into pa
 
 # Plain text post
 pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
-pintomind posts create plain --name "Msg" --body "<p>Content</p>" --justification center --fontsize large
+pintomind posts create plain --name "Msg" --body "<p>Content</p>" --body-alignment center --body-fontsize 150
 
 # Feed post (creates an RSS/Atom resource automatically)
 pintomind posts create feed --name "News" --url https://rss.example.com --channel-id 7

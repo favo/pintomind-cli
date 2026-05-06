@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -334,21 +335,136 @@ func newPostsCreateImageCmd() *cobra.Command {
 	return cmd
 }
 
+// createMediaBoxID creates a media box and returns its ID.
+func createMediaBoxID(a *appctx.App, boxType string, data map[string]any) (int, error) {
+	var resp map[string]any
+	if err := a.Client.Post("/media_boxes", map[string]any{
+		"type":      boxType,
+		"media_box": data,
+	}, &resp); err != nil {
+		return 0, err
+	}
+	return intFromNestedResp(resp, "media_box", "id")
+}
+
 // newPostsCreatePlainCmd creates a plain text post.
 func newPostsCreatePlainCmd() *cobra.Command {
-	var name, heading, body, justification, fontsize string
+	var name, heading, body string
+	var headingAlignment, bodyAlignment string
+	var headingFontsize, bodyFontsize int
+	var images, emojis, icons, gifs, unsplashIDs []string
+	var mediaIDs []int
 	var pf publishOpts
 
 	cmd := &cobra.Command{
 		Use:   "plain",
 		Short: "Create a plain text post",
 		Example: `  pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
-  pintomind posts create plain --name "Msg" --heading "<p>Hi</p>" --body "<p>Content</p>" --justification center --fontsize large`,
+  pintomind posts create plain --name "Msg" --heading "<p>Hi</p>" --heading-alignment center --heading-fontsize 150 --body "<p>Content</p>" --body-alignment left --body-fontsize 80
+  pintomind posts create plain --name "Photo" --heading "<p>Look</p>" --image ./photo.jpg --unsplash abc123 --channel-id 7`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 
 			if !cmd.Flags().Changed("heading") && !cmd.Flags().Changed("body") {
 				return fmt.Errorf("provide at least one of --heading or --body")
+			}
+
+			for _, f := range []struct {
+				name string
+				val  int
+			}{
+				{"heading-fontsize", headingFontsize},
+				{"body-fontsize", bodyFontsize},
+			} {
+				if cmd.Flags().Changed(f.name) && (f.val < 50 || f.val > 400) {
+					return fmt.Errorf("--%s must be between 50 and 400", f.name)
+				}
+			}
+
+			totalBoxes := len(images) + len(mediaIDs) + len(gifs) + len(unsplashIDs) + len(emojis) + len(icons)
+			if totalBoxes > 4 {
+				return fmt.Errorf("maximum 4 media boxes allowed, got %d", totalBoxes)
+			}
+
+			// Collect media box IDs, creating each in turn.
+			var mediaBoxIDs []int
+
+			for _, imgPath := range images {
+				colID, err := findDefaultCollection(a, "image")
+				if err != nil {
+					return err
+				}
+				uploaded, err := uploadFileToCollection(a, imgPath, strconv.Itoa(colID))
+				if err != nil {
+					return err
+				}
+				boxID, err := createMediaBoxID(a, "media", map[string]any{"media_id": uploaded[0]})
+				if err != nil {
+					return fmt.Errorf("creating media box for %s: %w", imgPath, err)
+				}
+				if !a.JSONOutput {
+					fmt.Printf("Created media box %d\n", boxID)
+				}
+				mediaBoxIDs = append(mediaBoxIDs, boxID)
+			}
+
+			for _, mID := range mediaIDs {
+				boxID, err := createMediaBoxID(a, "media", map[string]any{"media_id": mID})
+				if err != nil {
+					return fmt.Errorf("creating media box for media %d: %w", mID, err)
+				}
+				if !a.JSONOutput {
+					fmt.Printf("Created media box %d\n", boxID)
+				}
+				mediaBoxIDs = append(mediaBoxIDs, boxID)
+			}
+
+			for _, gifID := range gifs {
+				boxID, err := createMediaBoxID(a, "gif", map[string]any{"gif_id": gifID})
+				if err != nil {
+					return fmt.Errorf("creating media box for gif %s: %w", gifID, err)
+				}
+				if !a.JSONOutput {
+					fmt.Printf("Created media box %d\n", boxID)
+				}
+				mediaBoxIDs = append(mediaBoxIDs, boxID)
+			}
+
+			for _, photoID := range unsplashIDs {
+				boxID, err := createMediaBoxID(a, "unsplash", map[string]any{"photo_id": photoID})
+				if err != nil {
+					return fmt.Errorf("creating media box for unsplash %s: %w", photoID, err)
+				}
+				if !a.JSONOutput {
+					fmt.Printf("Created media box %d\n", boxID)
+				}
+				mediaBoxIDs = append(mediaBoxIDs, boxID)
+			}
+
+			for _, emoji := range emojis {
+				boxID, err := createMediaBoxID(a, "emoji", map[string]any{"emoji": emoji})
+				if err != nil {
+					return fmt.Errorf("creating media box for emoji %s: %w", emoji, err)
+				}
+				if !a.JSONOutput {
+					fmt.Printf("Created media box %d\n", boxID)
+				}
+				mediaBoxIDs = append(mediaBoxIDs, boxID)
+			}
+
+			for _, icon := range icons {
+				iconName, iconType, _ := strings.Cut(icon, ":")
+				if iconType == "" {
+					iconType = "regular"
+				}
+				boxID, err := createMediaBoxID(a, "icon", map[string]any{"icon_name": iconName, "icon_type": iconType})
+				if err != nil {
+					return fmt.Errorf("creating media box for icon %s: %w", icon, err)
+				}
+				if !a.JSONOutput {
+					fmt.Printf("Created media box %d\n", boxID)
+				}
+				mediaBoxIDs = append(mediaBoxIDs, boxID)
 			}
 
 			post := map[string]any{}
@@ -361,11 +477,30 @@ func newPostsCreatePlainCmd() *cobra.Command {
 			if cmd.Flags().Changed("body") {
 				post["body"] = body
 			}
-			if cmd.Flags().Changed("justification") {
-				post["justification"] = justification
+			if len(mediaBoxIDs) > 0 {
+				post["media_box_ids"] = mediaBoxIDs
 			}
-			if cmd.Flags().Changed("fontsize") {
-				post["fontsize"] = fontsize
+
+			if cmd.Flags().Changed("heading-alignment") || cmd.Flags().Changed("heading-fontsize") {
+				opts := map[string]any{}
+				if cmd.Flags().Changed("heading-alignment") {
+					opts["alignment"] = headingAlignment
+				}
+				if cmd.Flags().Changed("heading-fontsize") {
+					opts["fontsize"] = headingFontsize
+				}
+				post["heading_options"] = opts
+			}
+
+			if cmd.Flags().Changed("body-alignment") || cmd.Flags().Changed("body-fontsize") {
+				opts := map[string]any{}
+				if cmd.Flags().Changed("body-alignment") {
+					opts["alignment"] = bodyAlignment
+				}
+				if cmd.Flags().Changed("body-fontsize") {
+					opts["fontsize"] = bodyFontsize
+				}
+				post["body_options"] = opts
 			}
 
 			var postResp map[string]any
@@ -395,8 +530,16 @@ func newPostsCreatePlainCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
 	cmd.Flags().StringVar(&heading, "heading", "", "Heading HTML (e.g. '<p>Hello</p>')")
 	cmd.Flags().StringVar(&body, "body", "", "Body HTML")
-	cmd.Flags().StringVar(&justification, "justification", "", "Text alignment: left, center, or right")
-	cmd.Flags().StringVar(&fontsize, "fontsize", "", "Font size: small, medium, large, or xlarge")
+	cmd.Flags().StringVar(&headingAlignment, "heading-alignment", "", "Heading text alignment: left, center, or right")
+	cmd.Flags().IntVar(&headingFontsize, "heading-fontsize", 100, "Heading font size as percentage (50–400, default 100)")
+	cmd.Flags().StringVar(&bodyAlignment, "body-alignment", "", "Body text alignment: left, center, or right")
+	cmd.Flags().IntVar(&bodyFontsize, "body-fontsize", 100, "Body font size as percentage (50–400, default 100)")
+	cmd.Flags().StringArrayVar(&images, "image", nil, "Image file or URL to upload as media box (repeatable, max 4 total)")
+	cmd.Flags().IntSliceVar(&mediaIDs, "media", nil, "Existing media ID to use as media box (repeatable)")
+	cmd.Flags().StringArrayVar(&gifs, "gif", nil, "GIF ID for a gif media box (repeatable)")
+	cmd.Flags().StringArrayVar(&unsplashIDs, "unsplash", nil, "Unsplash photo ID for an unsplash media box (repeatable)")
+	cmd.Flags().StringArrayVar(&emojis, "emoji", nil, "Emoji character for an emoji media box (repeatable)")
+	cmd.Flags().StringArrayVar(&icons, "icon", nil, "Icon name (or name:type) for an icon media box (repeatable)")
 	addPublishFlags(cmd, &pf)
 	return cmd
 }

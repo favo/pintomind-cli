@@ -245,7 +245,7 @@ pintomind posts create image --name "X" --image ./photo.jpg --media-collection 1
 
 # Plain text post
 pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
-pintomind posts create plain --name "Msg" --heading "<p>Hi</p>" --body "<p>Body</p>" --justification center --fontsize large
+pintomind posts create plain --name "Msg" --heading "<p>Hi</p>" --heading-alignment center --heading-fontsize 150 --body "<p>Body</p>" --body-alignment left --body-fontsize 80
 
 # Feed post — creates a feed resource then the post
 pintomind posts create feed --name "News" --url https://example.com/rss.xml --channel-id 7
