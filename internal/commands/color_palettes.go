@@ -33,6 +33,7 @@ func NewColorPalettesCmd() *cobra.Command {
 	cmd.AddCommand(newColorPalettesCreateCmd())
 	cmd.AddCommand(newColorPalettesUpdateCmd())
 	cmd.AddCommand(newColorPalettesDeleteCmd())
+	cmd.AddCommand(newSchemaSubCmd(map[string]string{"color-palette": "color_palette"}))
 	return cmd
 }
 

@@ -30,6 +30,7 @@ func NewThemesCmd() *cobra.Command {
 	cmd.AddCommand(newThemesCreateCmd())
 	cmd.AddCommand(newThemesUpdateCmd())
 	cmd.AddCommand(newThemesDeleteCmd())
+	cmd.AddCommand(newSchemaSubCmd(map[string]string{"theme": "theme"}))
 	return cmd
 }
 

@@ -56,6 +56,22 @@ func NewPostsCmd() *cobra.Command {
 	cmd.AddCommand(newPostsPublicationsCmd())
 	cmd.AddCommand(newPostsPublishCmd())
 	cmd.AddCommand(newPostsUnpublishCmd())
+	cmd.AddCommand(newSchemaSubCmd(map[string]string{
+		"calendar":    "post_calendar",
+		"clock":       "post_clock",
+		"counter":     "post_counter",
+		"entur":       "post_entur",
+		"feed":        "post_feed",
+		"forecast":    "post_forecast",
+		"iframe":      "post_iframe",
+		"image":       "post_image",
+		"plain":       "post_plain",
+		"poster":      "post_poster",
+		"power-price": "post_power_price",
+		"video":       "post_video",
+		"world-clock": "post_world_clock",
+		"youtube":     "post_youtube",
+	}))
 	return cmd
 }
 

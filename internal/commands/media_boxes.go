@@ -40,6 +40,14 @@ func NewMediaBoxesCmd() *cobra.Command {
 	cmd.AddCommand(createCmd)
 	cmd.AddCommand(newMediaBoxesUpdateCmd())
 	cmd.AddCommand(newMediaBoxesDeleteCmd())
+	cmd.AddCommand(newSchemaSubCmd(map[string]string{
+		"emoji":    "media_box_emoji",
+		"gif":      "media_box_gif",
+		"icon":     "media_box_icon",
+		"media":    "media_box_image",
+		"qr-code":  "media_box_qr_code",
+		"unsplash": "media_box_unsplash",
+	}))
 	return cmd
 }
 

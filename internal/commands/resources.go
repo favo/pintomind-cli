@@ -28,6 +28,21 @@ func NewResourcesCmd() *cobra.Command {
 	cmd.AddCommand(createCmd)
 	cmd.AddCommand(newResourcesUpdateCmd())
 	cmd.AddCommand(newResourcesAppendCmd())
+	cmd.AddCommand(newSchemaSubCmd(map[string]string{
+		"calendar":         "calendar",
+		"calendar-events":  "calendar_events",
+		"entur":            "entur",
+		"external-image":   "external_image",
+		"external-webpage": "external_webpage",
+		"feed":             "feed",
+		"feed-items":       "feed_items",
+		"html":             "html",
+		"location":         "location",
+		"poster-page":      "poster_page",
+		"qr-code":          "qr_code",
+		"text":             "text",
+		"youtube":          "youtube",
+	}))
 	cmd.AddCommand(newResourcesRefreshCmd())
 	cmd.AddCommand(newResourcesDeleteCmd())
 	return cmd

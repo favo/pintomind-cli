@@ -33,6 +33,10 @@ func NewFontFamiliesCmd() *cobra.Command {
 	cmd.AddCommand(newFontFamiliesCreateCmd())
 	cmd.AddCommand(newFontFamiliesUpdateCmd())
 	cmd.AddCommand(newFontFamiliesDeleteCmd())
+	cmd.AddCommand(newSchemaSubCmd(map[string]string{
+		"remote-css": "font_family_remote_css",
+		"uploaded":   "font_family_uploaded",
+	}))
 	return cmd
 }
 
