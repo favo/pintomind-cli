@@ -30,7 +30,14 @@ func NewMediaBoxesCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newMediaBoxesListCmd())
 	cmd.AddCommand(newMediaBoxesShowCmd())
-	cmd.AddCommand(newMediaBoxesCreateCmd())
+	createCmd := newMediaBoxesCreateCmd()
+	createCmd.AddCommand(newMediaBoxesCreateMediaCmd())
+	createCmd.AddCommand(newMediaBoxesCreateIconCmd())
+	createCmd.AddCommand(newMediaBoxesCreateEmojiCmd())
+	createCmd.AddCommand(newMediaBoxesCreateGifCmd())
+	createCmd.AddCommand(newMediaBoxesCreateUnsplashCmd())
+	createCmd.AddCommand(newMediaBoxesCreateQRCodeCmd())
+	cmd.AddCommand(createCmd)
 	cmd.AddCommand(newMediaBoxesUpdateCmd())
 	cmd.AddCommand(newMediaBoxesDeleteCmd())
 	return cmd
@@ -109,40 +116,10 @@ func newMediaBoxesShowCmd() *cobra.Command {
 }
 
 func newMediaBoxesCreateCmd() *cobra.Command {
-	var boxType, data string
-
-	cmd := &cobra.Command{
-		Use:   "create --type <type> --data '<json>'",
+	return &cobra.Command{
+		Use:   "create",
 		Short: "Create a media box",
-		Example: `  pintomind media-boxes create --type media --data '{"media_id":42,"background_size":"cover"}'
-  pintomind media-boxes create --type icon --data '{"icon_name":"rocket-launch","icon_type":"regular"}'
-  pintomind media-boxes create --type emoji --data '{"emoji":"✨"}'
-  pintomind media-boxes create --type qr_code --data '{"url":"https://example.com"}'
-  pintomind media-boxes create --type unsplash --data '{"photo_id":"abc123"}'
-  pintomind media-boxes create --type gif --data '{"gif_id":"xT9IgG50Fb7Mi0only"}'`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			a := app(cmd)
-			var mediaBox map[string]any
-			if err := json.Unmarshal([]byte(data), &mediaBox); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
-			}
-			body := map[string]any{
-				"type":      boxType,
-				"media_box": mediaBox,
-			}
-			var resp map[string]any
-			if err := a.Client.Post("/media_boxes", body, &resp); err != nil {
-				return err
-			}
-			printJSON(resp)
-			return nil
-		},
 	}
-	cmd.Flags().StringVar(&boxType, "type", "", "Media box type alias: media, icon, emoji, gif, unsplash, or qr_code (required)")
-	cmd.Flags().StringVar(&data, "data", "", "Media box fields as JSON (required)")
-	_ = cmd.MarkFlagRequired("type")
-	_ = cmd.MarkFlagRequired("data")
-	return cmd
 }
 
 func newMediaBoxesUpdateCmd() *cobra.Command {
@@ -199,5 +176,193 @@ func newMediaBoxesDeleteCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
+	return cmd
+}
+
+func newMediaBoxesCreateMediaCmd() *cobra.Command {
+	var mediaID int
+	var backgroundSize, backgroundFillType string
+	var x, y, relativeSize float64
+
+	cmd := &cobra.Command{
+		Use:   "media --media-id <id>",
+		Short: "Create a media box from a library media item",
+		Example: `  pintomind media-boxes create media --media-id 42
+  pintomind media-boxes create media --media-id 42 --background-size cover --x 0.5 --y 0.5`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			data := map[string]any{"media_id": mediaID}
+			if backgroundSize != "" {
+				data["background_size"] = backgroundSize
+			}
+			if backgroundFillType != "" {
+				data["background_fill_type"] = backgroundFillType
+			}
+			if cmd.Flags().Changed("x") {
+				data["x"] = x
+			}
+			if cmd.Flags().Changed("y") {
+				data["y"] = y
+			}
+			if cmd.Flags().Changed("relative-size") {
+				data["relative_size"] = relativeSize
+			}
+			return createMediaBoxAndPrint(a, "media", data)
+		},
+	}
+	cmd.Flags().IntVar(&mediaID, "media-id", 0, "Media item ID (required)")
+	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size: cover, contain, auto")
+	cmd.Flags().StringVar(&backgroundFillType, "background-fill-type", "", "Background fill type")
+	cmd.Flags().Float64Var(&x, "x", 0, "Horizontal focal point (0.0–1.0)")
+	cmd.Flags().Float64Var(&y, "y", 0, "Vertical focal point (0.0–1.0)")
+	cmd.Flags().Float64Var(&relativeSize, "relative-size", 0, "Relative size (0.0–1.0)")
+	_ = cmd.MarkFlagRequired("media-id")
+	return cmd
+}
+
+func newMediaBoxesCreateIconCmd() *cobra.Command {
+	var iconName, iconType string
+	var relativeSize float64
+
+	cmd := &cobra.Command{
+		Use:   "icon --icon-name <name> --icon-type <type>",
+		Short: "Create a media box from an icon",
+		Example: `  pintomind media-boxes create icon --icon-name rocket-launch --icon-type regular
+  pintomind media-boxes create icon --icon-name rocket-launch --icon-type solid --relative-size 0.8`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			data := map[string]any{"icon_name": iconName, "icon_type": iconType}
+			if cmd.Flags().Changed("relative-size") {
+				data["relative_size"] = relativeSize
+			}
+			return createMediaBoxAndPrint(a, "icon", data)
+		},
+	}
+	cmd.Flags().StringVar(&iconName, "icon-name", "", "Icon name (required)")
+	cmd.Flags().StringVar(&iconType, "icon-type", "", "Icon type, e.g. regular or solid (required)")
+	cmd.Flags().Float64Var(&relativeSize, "relative-size", 0, "Relative size (0.0–1.0)")
+	_ = cmd.MarkFlagRequired("icon-name")
+	_ = cmd.MarkFlagRequired("icon-type")
+	return cmd
+}
+
+func newMediaBoxesCreateEmojiCmd() *cobra.Command {
+	var emoji string
+	var relativeSize float64
+
+	cmd := &cobra.Command{
+		Use:   "emoji --emoji <char>",
+		Short: "Create a media box from an emoji character",
+		Example: `  pintomind media-boxes create emoji --emoji '✨'
+  pintomind media-boxes create emoji --emoji '🎂' --relative-size 0.8`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			data := map[string]any{"emoji": emoji}
+			if cmd.Flags().Changed("relative-size") {
+				data["relative_size"] = relativeSize
+			}
+			return createMediaBoxAndPrint(a, "emoji", data)
+		},
+	}
+	cmd.Flags().StringVar(&emoji, "emoji", "", "Emoji character (required)")
+	cmd.Flags().Float64Var(&relativeSize, "relative-size", 0, "Relative size (0.0–1.0)")
+	_ = cmd.MarkFlagRequired("emoji")
+	return cmd
+}
+
+func newMediaBoxesCreateGifCmd() *cobra.Command {
+	var gifID, backgroundSize, backgroundFillType string
+	var x, y, relativeSize float64
+
+	cmd := &cobra.Command{
+		Use:   "gif --gif-id <id>",
+		Short: "Create a media box from a Giphy GIF",
+		Example: `  pintomind media-boxes create gif --gif-id xT9IgG50Fb7Mi0only
+  pintomind media-boxes create gif --gif-id xT9IgG50Fb7Mi0only --background-size contain --x 0.5 --y 0.5`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			data := map[string]any{"gif_id": gifID}
+			if backgroundSize != "" {
+				data["background_size"] = backgroundSize
+			}
+			if backgroundFillType != "" {
+				data["background_fill_type"] = backgroundFillType
+			}
+			if cmd.Flags().Changed("x") {
+				data["x"] = x
+			}
+			if cmd.Flags().Changed("y") {
+				data["y"] = y
+			}
+			if cmd.Flags().Changed("relative-size") {
+				data["relative_size"] = relativeSize
+			}
+			return createMediaBoxAndPrint(a, "gif", data)
+		},
+	}
+	cmd.Flags().StringVar(&gifID, "gif-id", "", "Giphy GIF ID (required)")
+	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size: cover, contain, auto")
+	cmd.Flags().StringVar(&backgroundFillType, "background-fill-type", "", "Background fill type")
+	cmd.Flags().Float64Var(&x, "x", 0, "Horizontal focal point (0.0–1.0)")
+	cmd.Flags().Float64Var(&y, "y", 0, "Vertical focal point (0.0–1.0)")
+	cmd.Flags().Float64Var(&relativeSize, "relative-size", 0, "Relative size (0.0–1.0)")
+	_ = cmd.MarkFlagRequired("gif-id")
+	return cmd
+}
+
+func newMediaBoxesCreateUnsplashCmd() *cobra.Command {
+	var photoID, backgroundSize, backgroundFillType string
+	var x, y, relativeSize float64
+
+	cmd := &cobra.Command{
+		Use:   "unsplash --photo-id <id>",
+		Short: "Create a media box from an Unsplash photo",
+		Example: `  pintomind media-boxes create unsplash --photo-id abc123
+  pintomind media-boxes create unsplash --photo-id abc123 --background-size cover --x 0.3 --y 0.7`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			data := map[string]any{"photo_id": photoID}
+			if backgroundSize != "" {
+				data["background_size"] = backgroundSize
+			}
+			if backgroundFillType != "" {
+				data["background_fill_type"] = backgroundFillType
+			}
+			if cmd.Flags().Changed("x") {
+				data["x"] = x
+			}
+			if cmd.Flags().Changed("y") {
+				data["y"] = y
+			}
+			if cmd.Flags().Changed("relative-size") {
+				data["relative_size"] = relativeSize
+			}
+			return createMediaBoxAndPrint(a, "unsplash", data)
+		},
+	}
+	cmd.Flags().StringVar(&photoID, "photo-id", "", "Unsplash photo ID (required)")
+	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size: cover, contain, auto")
+	cmd.Flags().StringVar(&backgroundFillType, "background-fill-type", "", "Background fill type")
+	cmd.Flags().Float64Var(&x, "x", 0, "Horizontal focal point (0.0–1.0)")
+	cmd.Flags().Float64Var(&y, "y", 0, "Vertical focal point (0.0–1.0)")
+	cmd.Flags().Float64Var(&relativeSize, "relative-size", 0, "Relative size (0.0–1.0)")
+	_ = cmd.MarkFlagRequired("photo-id")
+	return cmd
+}
+
+func newMediaBoxesCreateQRCodeCmd() *cobra.Command {
+	var qrURL string
+
+	cmd := &cobra.Command{
+		Use:     "qr-code --url <url>",
+		Short:   "Create a media box displaying a QR code",
+		Example: `  pintomind media-boxes create qr-code --url https://example.com`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			return createMediaBoxAndPrint(a, "qr_code", map[string]any{"url": qrURL})
+		},
+	}
+	cmd.Flags().StringVar(&qrURL, "url", "", "URL to encode as QR code (required)")
+	_ = cmd.MarkFlagRequired("url")
 	return cmd
 }

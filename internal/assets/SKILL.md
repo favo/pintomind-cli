@@ -464,9 +464,14 @@ pintomind media-boxes list --post-id <post-id>
 pintomind media-boxes show <id>
 
 # Create boxes
-pintomind media-boxes create --type media --data '{"media_id":42,"background_size":"cover","background_fill_type":"default","x":0.5,"y":0.5}'
-pintomind media-boxes create --type icon --data '{"icon_name":"rocket-launch","icon_type":"regular","relative_size":0.8}'
-pintomind media-boxes create --type emoji --data '{"emoji":"✨"}'
+pintomind media-boxes create media --media-id 42
+pintomind media-boxes create media --media-id 42 --background-size cover --x 0.5 --y 0.5
+pintomind media-boxes create icon --icon-name rocket-launch --icon-type regular
+pintomind media-boxes create icon --icon-name rocket-launch --icon-type solid --relative-size 0.8
+pintomind media-boxes create emoji --emoji '✨'
+pintomind media-boxes create gif --gif-id xT9IgG50Fb7Mi0only
+pintomind media-boxes create unsplash --photo-id abc123 --background-size cover
+pintomind media-boxes create qr-code --url https://example.com
 
 # Update/delete boxes
 pintomind media-boxes update <id> --data '{"icon_name":"fire"}'
@@ -511,7 +516,7 @@ Inspect exact fields with `pintomind schemas show media_box_image`, `media_box_i
 pintomind icons   # lists available icon names, types, and categories for icon media boxes
 ```
 
-Scope: `media_boxes:read`. Returns `{ names: [...], types: [...], categories: [...] }`. Use `icon_name` values here with `pintomind media-boxes create --type icon`.
+Scope: `media_boxes:read`. Returns `{ names: [...], types: [...], categories: [...] }`. Use `icon_name` values here with `pintomind media-boxes create icon --icon-name <name> --icon-type <type>`.
 
 ## Themes
 

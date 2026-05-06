@@ -347,6 +347,19 @@ func createMediaBoxID(a *appctx.App, boxType string, data map[string]any) (int, 
 	return intFromNestedResp(resp, "media_box", "id")
 }
 
+// createMediaBoxAndPrint creates a media box and prints the full JSON response.
+func createMediaBoxAndPrint(a *appctx.App, boxType string, data map[string]any) error {
+	var resp map[string]any
+	if err := a.Client.Post("/media_boxes", map[string]any{
+		"type":      boxType,
+		"media_box": data,
+	}, &resp); err != nil {
+		return err
+	}
+	printJSON(resp)
+	return nil
+}
+
 // newPostsCreatePlainCmd creates a plain text post.
 func newPostsCreatePlainCmd() *cobra.Command {
 	var name, heading, body string
