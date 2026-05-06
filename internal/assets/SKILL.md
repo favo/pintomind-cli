@@ -564,13 +564,13 @@ pintomind font-families show <id>
 pintomind font-families stats
 
 # Remote CSS font (e.g. Google Fonts)
-pintomind font-families create --type remote_css --name "Inter" \
+pintomind font-families create remote-css --name "Inter" \
   --url "https://fonts.googleapis.com/css2?family=Inter:wght@400;700"
 
 # Uploaded font — pass local file paths (.ttf/.otf/.woff/.woff2)
-pintomind font-families create --type uploaded --name "MyFont" \
+pintomind font-families create uploaded --name "MyFont" \
   --font-normal ./MyFont-Regular.ttf --font-bold ./MyFont-Bold.ttf
-pintomind font-families create --type uploaded --name "MyFont" \
+pintomind font-families create uploaded --name "MyFont" \
   --font-normal ./MyFont-Regular.ttf --font-bold ./MyFont-Bold.ttf \
   --font-italic ./MyFont-Italic.ttf --font-bold-italic ./MyFont-BoldItalic.ttf
 
@@ -614,7 +614,7 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Apply a theme to every channel: `pintomind channels set-theme --all <theme-id>`
 - List all color palettes: `pintomind color-palettes list --json | jq '.items[] | {id, name, primary_color}'`
 - Create a palette and use it in a theme: `pintomind color-palettes create --name "Brand" --primary-color "#1F8A8A"` then `pintomind themes update <theme-id> --data '{"color_palette_id":<id>}'`
-- Add a Google Font: `pintomind font-families create --type remote_css --name "Inter" --url "https://fonts.googleapis.com/css2?family=Inter:wght@400;700"`
+- Add a Google Font: `pintomind font-families create remote-css --name "Inter" --url "https://fonts.googleapis.com/css2?family=Inter:wght@400;700"`
 - Upload a file to media: `pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"`
 - Publish a photo to a channel in one step: `pintomind publish ./photo.jpg --channel-id 7`
 - Inspect valid resource fields: `pintomind schemas show text`

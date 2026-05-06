@@ -510,11 +510,18 @@ pintomind color-palettes stats
 
 ```bash
 pintomind font-families list   # alias: pintomind fonts list
+pintomind font-families list --type remote_css
 pintomind font-families show <id>
-pintomind font-families create --data '{"name":"My Font","font_type":"google","font_family":"Inter"}'
-pintomind font-families update <id> --data '{"name":"Updated name"}'
-pintomind font-families delete <id>
 pintomind font-families stats
+
+# Remote CSS font (e.g. Google Fonts)
+pintomind font-families create remote-css --name "Inter" --url "https://fonts.googleapis.com/css2?family=Inter:wght@400;700"
+
+# Upload font files (.ttf/.otf/.woff/.woff2)
+pintomind font-families create uploaded --name "MyFont" --font-normal ./MyFont-Regular.ttf --font-bold ./MyFont-Bold.ttf
+
+pintomind font-families update <id> --name "Renamed"
+pintomind font-families delete <id>
 ```
 
 ### Raw API access
