@@ -286,6 +286,7 @@ func newPostsCreateImageCmd() *cobra.Command {
 	var mediaCollection int
 	var duration int
 	var pf publishOpts
+	var interactive bool
 
 	cmd := &cobra.Command{
 		Use:   "image",
@@ -296,8 +297,17 @@ func newPostsCreateImageCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 
+			if interactive {
+				if err := interactivePostImage(&name, &images, &mediaIDs, &duration, &pf); err != nil {
+					if isAborted(err) {
+						return nil
+					}
+					return err
+				}
+			}
+
 			if len(images) == 0 && len(mediaIDs) == 0 {
-				return fmt.Errorf("provide at least one --image or --media flag")
+				return fmt.Errorf("provide at least one --image or --media flag (or use --interactive / -i)")
 			}
 
 			allMediaIDs := make([]int, 0, len(images)+len(mediaIDs))
@@ -331,6 +341,7 @@ func newPostsCreateImageCmd() *cobra.Command {
 	cmd.Flags().IntSliceVar(&mediaIDs, "media", nil, "Existing media ID to include (repeatable)")
 	cmd.Flags().IntVar(&mediaCollection, "media-collection", 0, "Media collection ID for uploads (defaults to default image collection)")
 	cmd.Flags().IntVar(&duration, "duration", 7, "Seconds per slide")
+	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
 	return cmd
 }
@@ -368,6 +379,7 @@ func newPostsCreatePlainCmd() *cobra.Command {
 	var images, emojis, icons, gifs, unsplashIDs []string
 	var mediaIDs []int
 	var pf publishOpts
+	var interactive bool
 
 	cmd := &cobra.Command{
 		Use:   "plain",
@@ -378,8 +390,43 @@ func newPostsCreatePlainCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 
+			if interactive {
+				var mbi plainMediaBoxInputs
+				if err := interactivePostPlain(&name, &heading, &body, &headingAlignment, &bodyAlignment, &headingFontsize, &bodyFontsize, &mbi, &pf); err != nil {
+					if isAborted(err) {
+						return nil
+					}
+					return err
+				}
+				// Mark flags as changed so the existing logic below picks up the values.
+				if heading != "" {
+					_ = cmd.Flags().Set("heading", heading)
+				}
+				if body != "" {
+					_ = cmd.Flags().Set("body", body)
+				}
+				if headingAlignment != "" {
+					_ = cmd.Flags().Set("heading-alignment", headingAlignment)
+				}
+				if headingFontsize != 100 {
+					_ = cmd.Flags().Set("heading-fontsize", strconv.Itoa(headingFontsize))
+				}
+				if bodyAlignment != "" {
+					_ = cmd.Flags().Set("body-alignment", bodyAlignment)
+				}
+				if bodyFontsize != 100 {
+					_ = cmd.Flags().Set("body-fontsize", strconv.Itoa(bodyFontsize))
+				}
+				images = mbi.images
+				mediaIDs = mbi.mediaIDs
+				gifs = mbi.gifs
+				unsplashIDs = mbi.unsplashIDs
+				emojis = mbi.emojis
+				icons = mbi.icons
+			}
+
 			if !cmd.Flags().Changed("heading") && !cmd.Flags().Changed("body") {
-				return fmt.Errorf("provide at least one of --heading or --body")
+				return fmt.Errorf("provide at least one of --heading or --body (or use --interactive / -i)")
 			}
 
 			for _, f := range []struct {
@@ -553,20 +600,40 @@ func newPostsCreatePlainCmd() *cobra.Command {
 	cmd.Flags().StringArrayVar(&unsplashIDs, "unsplash", nil, "Unsplash photo ID for an unsplash media box (repeatable)")
 	cmd.Flags().StringArrayVar(&emojis, "emoji", nil, "Emoji character for an emoji media box (repeatable)")
 	cmd.Flags().StringArrayVar(&icons, "icon", nil, "Icon name (or name:type) for an icon media box (repeatable)")
+	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
 	return cmd
 }
 
 // newPostsCreateURLResourcePostCmd is a factory for post types backed by a single URL-based resource.
-func newPostsCreateURLResourcePostCmd(use, short, postType, resourceType, urlField string) *cobra.Command {
+// interactiveFn, when non-nil, is called in interactive mode to collect name, url, and publish opts.
+func newPostsCreateURLResourcePostCmd(
+	use, short, postType, resourceType, urlField string,
+	interactiveFn func(name, urlStr *string, p *publishOpts) error,
+) *cobra.Command {
 	var name, urlStr string
 	var pf publishOpts
+	var interactive bool
 
 	cmd := &cobra.Command{
 		Use:   use,
 		Short: short,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
+
+			if interactive {
+				if err := interactiveFn(&name, &urlStr, &pf); err != nil {
+					if isAborted(err) {
+						return nil
+					}
+					return err
+				}
+			}
+
+			if urlStr == "" {
+				return fmt.Errorf("--url is required (or use --interactive / -i)")
+			}
+
 			resourceData := map[string]any{urlField: urlStr}
 			if name != "" {
 				resourceData["title"] = name
@@ -576,9 +643,9 @@ func newPostsCreateURLResourcePostCmd(use, short, postType, resourceType, urlFie
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
-	cmd.Flags().StringVar(&urlStr, "url", "", "URL (required)")
+	cmd.Flags().StringVar(&urlStr, "url", "", "URL")
+	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
-	_ = cmd.MarkFlagRequired("url")
 	return cmd
 }
 
@@ -587,6 +654,7 @@ func newPostsCreateFeedCmd() *cobra.Command {
 		"feed",
 		"Create a feed post from an RSS/Atom URL",
 		"feed", "feed", "url",
+		interactivePostFeed,
 	)
 }
 
@@ -595,12 +663,14 @@ func newPostsCreateCalendarCmd() *cobra.Command {
 		"calendar",
 		"Create a calendar post from an iCal/WebCal URL",
 		"calendar", "calendar", "url",
+		interactivePostCalendar,
 	)
 }
 
 func newPostsCreateIframeCmd() *cobra.Command {
 	var name, urlStr, htmlContent, imageURL string
 	var pf publishOpts
+	var interactive bool
 
 	cmd := &cobra.Command{
 		Use:   "iframe",
@@ -611,6 +681,24 @@ func newPostsCreateIframeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 
+			if interactive {
+				var iframeSource string
+				if err := interactivePostIframe(&name, &urlStr, &htmlContent, &imageURL, &iframeSource, &pf); err != nil {
+					if isAborted(err) {
+						return nil
+					}
+					return err
+				}
+				switch iframeSource {
+				case "url":
+					_ = cmd.Flags().Set("url", urlStr)
+				case "html":
+					_ = cmd.Flags().Set("html", htmlContent)
+				case "image":
+					_ = cmd.Flags().Set("image", imageURL)
+				}
+			}
+
 			changed := 0
 			for _, f := range []string{"url", "html", "image"} {
 				if cmd.Flags().Changed(f) {
@@ -618,7 +706,7 @@ func newPostsCreateIframeCmd() *cobra.Command {
 				}
 			}
 			if changed == 0 {
-				return fmt.Errorf("provide one of --url, --html, or --image")
+				return fmt.Errorf("provide one of --url, --html, or --image (or use --interactive / -i)")
 			}
 			if changed > 1 {
 				return fmt.Errorf("only one of --url, --html, or --image may be specified")
@@ -649,6 +737,7 @@ func newPostsCreateIframeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&urlStr, "url", "", "Webpage URL to embed (https only)")
 	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display")
 	cmd.Flags().StringVar(&imageURL, "image", "", "Image URL to display (https only)")
+	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
 	return cmd
 }
@@ -656,6 +745,7 @@ func newPostsCreateIframeCmd() *cobra.Command {
 func newPostsCreateHTMLCmd() *cobra.Command {
 	var name, htmlContent string
 	var pf publishOpts
+	var interactive bool
 
 	cmd := &cobra.Command{
 		Use:     "html",
@@ -663,6 +753,20 @@ func newPostsCreateHTMLCmd() *cobra.Command {
 		Example: `  pintomind posts create html --name "Announcement" --html "<h1>Hello world</h1>" --channel-id 7`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
+
+			if interactive {
+				if err := interactivePostHTML(&name, &htmlContent, &pf); err != nil {
+					if isAborted(err) {
+						return nil
+					}
+					return err
+				}
+			}
+
+			if htmlContent == "" {
+				return fmt.Errorf("--html is required (or use --interactive / -i)")
+			}
+
 			resourceData := map[string]any{"html_code": htmlContent}
 			if name != "" {
 				resourceData["title"] = name
@@ -672,9 +776,9 @@ func newPostsCreateHTMLCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
-	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display (required)")
+	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display")
+	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
-	_ = cmd.MarkFlagRequired("html")
 	return cmd
 }
 
@@ -682,6 +786,7 @@ func newPostsCreatePosterCmd() *cobra.Command {
 	var name, sourceID string
 	var colorPaletteID int
 	var pf publishOpts
+	var interactive bool
 
 	cmd := &cobra.Command{
 		Use:   "poster",
@@ -690,6 +795,18 @@ func newPostsCreatePosterCmd() *cobra.Command {
   pintomind posts create poster --name "Brand poster" --source-id 42 --color-palette-id 5 --channel-id 7`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
+
+			if interactive {
+				if err := interactivePostPoster(&name, &sourceID, &colorPaletteID, &pf); err != nil {
+					if isAborted(err) {
+						return nil
+					}
+					return err
+				}
+				if colorPaletteID != 0 {
+					_ = cmd.Flags().Set("color-palette-id", strconv.Itoa(colorPaletteID))
+				}
+			}
 
 			post := map[string]any{}
 			if name != "" {
@@ -744,6 +861,7 @@ func newPostsCreatePosterCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
 	cmd.Flags().StringVar(&sourceID, "source-id", "", "Network poster template ID to duplicate")
 	cmd.Flags().IntVar(&colorPaletteID, "color-palette-id", 0, "Color palette ID to apply to the poster")
+	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
 	return cmd
 }
