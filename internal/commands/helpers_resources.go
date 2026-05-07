@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
 )
@@ -185,6 +186,62 @@ func newResourcesCreateLocationCmd() *cobra.Command {
 	_ = cmd.MarkFlagRequired("lon")
 	_ = cmd.MarkFlagRequired("country-code")
 	_ = cmd.MarkFlagRequired("timezone")
+	return cmd
+}
+
+func newResourcesCreateCalendarEventsCmd() *cobra.Command {
+	var title, itemsJSON string
+
+	cmd := &cobra.Command{
+		Use:   "calendar-events",
+		Short: "Create a calendar events resource with manually provided items",
+		Example: `  pintomind resources create calendar-events --items '[{"start_at":"2026-06-01T09:00:00Z","end_at":"2026-06-01T10:00:00Z","description":"Meeting"}]'`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			var items []any
+			if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
+				return fmt.Errorf("invalid JSON for --items: %w", err)
+			}
+			data := map[string]any{"items": items}
+			if title != "" {
+				data["title"] = title
+			}
+			return createResourceAndPrint(a, "calendar_events", data)
+		},
+	}
+	cmd.Flags().StringVar(&title, "title", "", "Resource title")
+	cmd.Flags().StringVar(&itemsJSON, "items", "", "Calendar event items as JSON array (required).\n"+
+		"Required per item: start_at (date-time), end_at (date-time), description (string).\n"+
+		"Optional per item: summary, location, all_day (bool), time_zone, recurrence_rule.")
+	_ = cmd.MarkFlagRequired("items")
+	return cmd
+}
+
+func newResourcesCreateFeedItemsCmd() *cobra.Command {
+	var title, itemsJSON string
+
+	cmd := &cobra.Command{
+		Use:   "feed-items",
+		Short: "Create a feed items resource with manually provided items",
+		Example: `  pintomind resources create feed-items --items '[{"title":"Breaking news","content":"Details here","url":"https://example.com"}]'`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			var items []any
+			if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
+				return fmt.Errorf("invalid JSON for --items: %w", err)
+			}
+			data := map[string]any{"items": items}
+			if title != "" {
+				data["title"] = title
+			}
+			return createResourceAndPrint(a, "feed_items", data)
+		},
+	}
+	cmd.Flags().StringVar(&title, "title", "", "Resource title")
+	cmd.Flags().StringVar(&itemsJSON, "items", "", "Feed items as JSON array (required).\n"+
+		"Required per item: title (string).\n"+
+		"Optional per item: content, url (https), image_url (https), published_at (date-time).")
+	_ = cmd.MarkFlagRequired("items")
 	return cmd
 }
 

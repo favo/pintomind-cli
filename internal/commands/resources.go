@@ -25,6 +25,8 @@ func NewResourcesCmd() *cobra.Command {
 	createCmd.AddCommand(newResourcesCreateHTMLCmd())
 	createCmd.AddCommand(newResourcesCreateYouTubeCmd())
 	createCmd.AddCommand(newResourcesCreateLocationCmd())
+	createCmd.AddCommand(newResourcesCreateCalendarEventsCmd())
+	createCmd.AddCommand(newResourcesCreateFeedItemsCmd())
 	cmd.AddCommand(createCmd)
 	cmd.AddCommand(newResourcesUpdateCmd())
 	cmd.AddCommand(newResourcesAppendCmd())
