@@ -122,7 +122,7 @@ func createResourceAndPrint(a *appctx.App, resourceType string, data map[string]
 }
 
 // createAndPublishImagePost creates an image post from mediaIDs, then publishes to channels.
-func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, duration int, p publishOpts) error {
+func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, duration int, p publishOpts, u untilOpts) error {
 	images := make([]map[string]any, len(mediaIDs))
 	for i, id := range mediaIDs {
 		images[i] = map[string]any{"media_id": id}
@@ -152,6 +152,10 @@ func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, durat
 		return err
 	}
 
+	if err := applyUntilSchedule(a, postID, u); err != nil {
+		return err
+	}
+
 	if a.JSONOutput {
 		printJSON(postResp)
 	}
@@ -159,7 +163,7 @@ func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, durat
 }
 
 // createResourceBackedPost creates a resource, then a post wired to it, then publishes.
-func createResourceBackedPost(a *appctx.App, postType, resourceType string, resourceData map[string]any, name string, p publishOpts) error {
+func createResourceBackedPost(a *appctx.App, postType, resourceType string, resourceData map[string]any, name string, p publishOpts, u untilOpts) error {
 	resourceID, err := createResource(a, resourceType, resourceData)
 	if err != nil {
 		return fmt.Errorf("creating %s resource: %w", resourceType, err)
@@ -187,6 +191,10 @@ func createResourceBackedPost(a *appctx.App, postType, resourceType string, reso
 	}
 
 	if err := publishToChannels(a, postID, p.channelIDs, p.area, p.fullScreen); err != nil {
+		return err
+	}
+
+	if err := applyUntilSchedule(a, postID, u); err != nil {
 		return err
 	}
 
@@ -237,12 +245,14 @@ func NewPublishCmd() *cobra.Command {
 	var collectionID int
 	var duration int
 	var pf publishOpts
+	var uo untilOpts
 
 	cmd := &cobra.Command{
 		Use:   "publish <file-or-url>",
 		Short: "Upload a file and publish it as an image post to one or more channels",
 		Example: `  pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
-  pintomind publish https://example.com/photo.jpg --channel-id 7 --channel-id 8 --name "Remote image"`,
+  pintomind publish https://example.com/photo.jpg --channel-id 7 --channel-id 8 --name "Remote image"
+  pintomind publish ./flyer.jpg --channel-id 7 --until 2026-06-30T17:00`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
@@ -267,7 +277,7 @@ func NewPublishCmd() *cobra.Command {
 				postName = filepath.Base(input)
 			}
 
-			return createAndPublishImagePost(a, postName, uploadedIDs, duration, pf)
+			return createAndPublishImagePost(a, postName, uploadedIDs, duration, pf, uo)
 		},
 	}
 
@@ -275,6 +285,7 @@ func NewPublishCmd() *cobra.Command {
 	cmd.Flags().IntVar(&collectionID, "media-collection", 0, "Media collection ID for upload (defaults to default image collection)")
 	cmd.Flags().IntVar(&duration, "duration", 7, "Seconds per slide")
 	addPublishFlags(cmd, &pf)
+	addUntilFlag(cmd, &uo)
 	return cmd
 }
 
@@ -286,6 +297,7 @@ func newPostsCreateImageCmd() *cobra.Command {
 	var mediaCollection int
 	var duration int
 	var pf publishOpts
+	var uo untilOpts
 	var interactive bool
 
 	cmd := &cobra.Command{
@@ -332,7 +344,7 @@ func newPostsCreateImageCmd() *cobra.Command {
 			}
 			allMediaIDs = append(allMediaIDs, mediaIDs...)
 
-			return createAndPublishImagePost(a, name, allMediaIDs, duration, pf)
+			return createAndPublishImagePost(a, name, allMediaIDs, duration, pf, uo)
 		},
 	}
 
@@ -343,6 +355,7 @@ func newPostsCreateImageCmd() *cobra.Command {
 	cmd.Flags().IntVar(&duration, "duration", 7, "Seconds per slide")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
+	addUntilFlag(cmd, &uo)
 	return cmd
 }
 
@@ -379,6 +392,7 @@ func newPostsCreatePlainCmd() *cobra.Command {
 	var images, emojis, icons, gifs, unsplashIDs []string
 	var mediaIDs []int
 	var pf publishOpts
+	var uo untilOpts
 	var interactive bool
 
 	cmd := &cobra.Command{
@@ -580,6 +594,10 @@ func newPostsCreatePlainCmd() *cobra.Command {
 				return err
 			}
 
+			if err := applyUntilSchedule(a, postID, uo); err != nil {
+				return err
+			}
+
 			if a.JSONOutput {
 				printJSON(postResp)
 			}
@@ -602,6 +620,7 @@ func newPostsCreatePlainCmd() *cobra.Command {
 	cmd.Flags().StringArrayVar(&icons, "icon", nil, "Icon name (or name:type) for an icon media box (repeatable)")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
+	addUntilFlag(cmd, &uo)
 	return cmd
 }
 
@@ -613,6 +632,7 @@ func newPostsCreateURLResourcePostCmd(
 ) *cobra.Command {
 	var name, urlStr string
 	var pf publishOpts
+	var uo untilOpts
 	var interactive bool
 
 	cmd := &cobra.Command{
@@ -638,7 +658,7 @@ func newPostsCreateURLResourcePostCmd(
 			if name != "" {
 				resourceData["title"] = name
 			}
-			return createResourceBackedPost(a, postType, resourceType, resourceData, name, pf)
+			return createResourceBackedPost(a, postType, resourceType, resourceData, name, pf, uo)
 		},
 	}
 
@@ -646,6 +666,7 @@ func newPostsCreateURLResourcePostCmd(
 	cmd.Flags().StringVar(&urlStr, "url", "", "URL")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
+	addUntilFlag(cmd, &uo)
 	return cmd
 }
 
@@ -670,6 +691,7 @@ func newPostsCreateCalendarCmd() *cobra.Command {
 func newPostsCreateIframeCmd() *cobra.Command {
 	var name, urlStr, htmlContent, imageURL string
 	var pf publishOpts
+	var uo untilOpts
 	var interactive bool
 
 	cmd := &cobra.Command{
@@ -729,7 +751,7 @@ func newPostsCreateIframeCmd() *cobra.Command {
 				resourceData["url"] = imageURL
 			}
 
-			return createResourceBackedPost(a, "iframe", resourceType, resourceData, name, pf)
+			return createResourceBackedPost(a, "iframe", resourceType, resourceData, name, pf, uo)
 		},
 	}
 
@@ -739,12 +761,14 @@ func newPostsCreateIframeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&imageURL, "image", "", "Image URL to display (https only)")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
+	addUntilFlag(cmd, &uo)
 	return cmd
 }
 
 func newPostsCreateHTMLCmd() *cobra.Command {
 	var name, htmlContent string
 	var pf publishOpts
+	var uo untilOpts
 	var interactive bool
 
 	cmd := &cobra.Command{
@@ -771,7 +795,7 @@ func newPostsCreateHTMLCmd() *cobra.Command {
 			if name != "" {
 				resourceData["title"] = name
 			}
-			return createResourceBackedPost(a, "iframe", "html", resourceData, name, pf)
+			return createResourceBackedPost(a, "iframe", "html", resourceData, name, pf, uo)
 		},
 	}
 
@@ -779,6 +803,7 @@ func newPostsCreateHTMLCmd() *cobra.Command {
 	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
+	addUntilFlag(cmd, &uo)
 	return cmd
 }
 
@@ -786,6 +811,7 @@ func newPostsCreatePosterCmd() *cobra.Command {
 	var name, sourceID string
 	var colorPaletteID int
 	var pf publishOpts
+	var uo untilOpts
 	var interactive bool
 
 	cmd := &cobra.Command{
@@ -851,6 +877,10 @@ func newPostsCreatePosterCmd() *cobra.Command {
 				return err
 			}
 
+			if err := applyUntilSchedule(a, postID, uo); err != nil {
+				return err
+			}
+
 			if a.JSONOutput {
 				printJSON(postResp)
 			}
@@ -863,6 +893,7 @@ func newPostsCreatePosterCmd() *cobra.Command {
 	cmd.Flags().IntVar(&colorPaletteID, "color-palette-id", 0, "Color palette ID to apply to the poster")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
 	addPublishFlags(cmd, &pf)
+	addUntilFlag(cmd, &uo)
 	return cmd
 }
 

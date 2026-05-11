@@ -150,6 +150,10 @@ func (c *Client) Patch(path string, body any, out any) error {
 	return c.do("PATCH", path, body, out)
 }
 
+func (c *Client) Put(path string, body any, out any) error {
+	return c.do("PUT", path, body, out)
+}
+
 func (c *Client) Post(path string, body any, out any) error {
 	return c.do("POST", path, body, out)
 }

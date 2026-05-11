@@ -176,7 +176,7 @@ pintomind schemas show grid_templates # named grid layouts for plain post variat
 
 Resource schema keys: `calendar`, `calendar_events`, `entur`, `external_image`, `external_webpage`, `feed`, `feed_items`, `html`, `location`, `qr_code`, `text`, `youtube`, `poster_page`.
 
-Post schema keys: `post_plain`, `post_image`, `post_video`, `post_youtube`, `post_iframe`, `post_calendar`, `post_clock`, `post_world_clock`, `post_counter`, `post_forecast`, `post_feed`, `post_entur`, `post_power_price`, `post_poster`.
+Post schema keys: `post_plain`, `post_image`, `post_video`, `post_youtube`, `post_iframe`, `post_calendar`, `post_clock`, `post_world_clock`, `post_counter`, `post_forecast`, `post_feed`, `post_entur`, `post_power_price`, `post_poster`, `post_time_schedule`.
 
 Media box schema keys: `media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, `media_box_unsplash`, `media_box_qr_code`.
 
@@ -270,6 +270,9 @@ All `posts create <type>` helpers accept:
 - `--channel-id N` (repeatable) — publish to one or more channels immediately
 - `--area F11` — channel area for all publications
 - `--full-screen` — publish fullscreen to all channels
+- `--until <YYYY-MM-DD[THH:MM]>` — auto-expire the post at this date/time (attaches a one-period schedule that unpublishes on expiry). Time defaults to `23:59` when omitted.
+
+`--until` is evaluated in each channel's local time zone. For richer schedules (recurring weekly windows, multiple periods, or other expiry actions) use `pintomind posts schedule set` after creating the post.
 
 ### Top-level `publish` shorthand
 
@@ -279,9 +282,50 @@ One-liner for the most common flow: upload a file and publish to a channel.
 pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
 pintomind publish https://example.com/photo.jpg --channel-id 7 --channel-id 8
 pintomind publish ./photo.jpg --channel-id 7 --media-collection 12 --duration 10
+pintomind publish ./flyer.jpg --channel-id 7 --until 2026-06-30T17:00
+pintomind publish ./flyer.jpg --channel-id 7 --until 2026-06-30
 ```
 
-Auto-detects the default image collection. Use `--collection-id` to override.
+Auto-detects the default image collection. Use `--collection-id` to override. `--until` behaves the same as on `posts create *`.
+
+### Time schedule
+
+Each post can have at most one time schedule that controls when it is visible. A schedule combines:
+
+- `recurring_rules` — weekly weekday/time windows (e.g. Mon–Fri 08:00–18:00). Optional `weeks` (`all` / `odd` / `even`) for bi-weekly cadence.
+- `time_periods` — concrete date ranges (e.g. 1 Jun – 30 Jun, 09:00–17:00).
+- `schedule_expiry_action` — what happens when the entire schedule has fully expired: `delete`, `archive`, or `unpublish`.
+
+```bash
+# Read the post's current schedule (404 when no schedule is set)
+pintomind posts schedule get <post-id>
+pintomind posts schedule get <post-id> --json
+
+# Set or replace a schedule (PUT — omitted sections are left unchanged)
+pintomind posts schedule set <post-id> \
+  --recurring-rule 'from_wday=1,to_wday=5,from_time=08:00,to_time=18:00' \
+  --recurring-rule 'from_wday=6,to_wday=6,from_time=10:00,to_time=14:00,weeks=odd' \
+  --period 'from_date=2026-06-01,to_date=2026-06-30,from_time=09:00,to_time=17:00' \
+  --expiry-action archive
+
+# Replace just one section with an empty list
+pintomind posts schedule set <post-id> --clear-periods
+pintomind posts schedule set <post-id> --clear-rules
+
+# Delete the schedule (post becomes always-visible)
+pintomind posts schedule clear <post-id>
+pintomind posts schedule clear <post-id> --force
+```
+
+Flag syntax for `set`:
+
+- `--period`: comma-separated `key=value`. Required: `from_date` (`YYYY-MM-DD`), `to_date`. Optional: `from_time` (`HH:MM`), `to_time`. Repeatable.
+- `--recurring-rule`: required: `from_wday` (0=Sun–6=Sat), `to_wday`, `from_time`, `to_time`. Optional: `weeks` (`all`, `odd`, `even`). Repeatable.
+- `--expiry-action`: `delete`, `archive`, or `unpublish`.
+
+Inspect the JSON schema with `pintomind posts schema time-schedule`.
+
+Time zones: weekdays and times are evaluated in the time zone of the channel the post is published to, not in your local zone. A post published to channels in different time zones turns on/off at each channel's local wall-clock time.
 
 ### Creating posts — raw JSON (all post types)
 

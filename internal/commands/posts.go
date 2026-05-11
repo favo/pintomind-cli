@@ -56,6 +56,7 @@ func NewPostsCmd() *cobra.Command {
 	cmd.AddCommand(newPostsPublicationsCmd())
 	cmd.AddCommand(newPostsPublishCmd())
 	cmd.AddCommand(newPostsUnpublishCmd())
+	cmd.AddCommand(newPostsScheduleCmd())
 	cmd.AddCommand(newSchemaSubCmd(map[string]string{
 		"calendar":    "post_calendar",
 		"clock":       "post_clock",
@@ -67,10 +68,11 @@ func NewPostsCmd() *cobra.Command {
 		"image":       "post_image",
 		"plain":       "post_plain",
 		"poster":      "post_poster",
-		"power-price": "post_power_price",
-		"video":       "post_video",
-		"world-clock": "post_world_clock",
-		"youtube":     "post_youtube",
+		"power-price":   "post_power_price",
+		"time-schedule": "post_time_schedule",
+		"video":         "post_video",
+		"world-clock":   "post_world_clock",
+		"youtube":       "post_youtube",
 	}))
 	return cmd
 }

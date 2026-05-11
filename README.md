@@ -127,9 +127,10 @@ pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
 pintomind publish https://example.com/banner.jpg --channel-id 7 --channel-id 8
 pintomind publish ./photo.jpg --channel-id 7 --duration 10 --full-screen
 pintomind publish ./photo.jpg --channel-id 7 --media-collection 42  # specific collection
+pintomind publish ./flyer.jpg --channel-id 7 --until 2026-06-30T17:00
 ```
 
-The CLI uploads the file, waits for processing, creates the image post, and publishes it — all in one command.
+The CLI uploads the file, waits for processing, creates the image post, and publishes it — all in one command. Use `--until <YYYY-MM-DD[THH:MM]>` to auto-expire the post (unpublishes it when the time is reached; for other expiry actions use `posts schedule set` after creation).
 
 ### Identity
 
@@ -240,7 +241,7 @@ pintomind posts delete <id> --force
 
 **Create posts with typed subcommands:**
 
-Each subcommand accepts `--channel-id` (repeatable), `--area`, and `--full-screen` to publish immediately after creation.
+Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
 
 ```bash
 # Image post — upload files and/or reference existing media IDs
@@ -290,6 +291,28 @@ pintomind posts publish <post-id> <channel-id> --full-screen
 pintomind posts unpublish <post-id> <publication-id>
 pintomind posts unpublish <post-id> <publication-id> --force
 ```
+
+**Time schedule — control when a post is visible:**
+
+Each post can carry one schedule combining recurring weekly windows and/or concrete date ranges. Times are evaluated in each channel's local time zone.
+
+```bash
+pintomind posts schedule get <post-id>
+pintomind posts schedule set <post-id> \
+  --recurring-rule 'from_wday=1,to_wday=5,from_time=08:00,to_time=18:00' \
+  --period 'from_date=2026-06-01,to_date=2026-06-30,from_time=09:00,to_time=17:00' \
+  --expiry-action archive
+pintomind posts schedule set <post-id> --clear-periods   # empty just that section
+pintomind posts schedule clear <post-id>                 # remove the schedule entirely
+```
+
+Flag syntax for `set`:
+
+- `--period 'from_date=YYYY-MM-DD,to_date=YYYY-MM-DD[,from_time=HH:MM,to_time=HH:MM]'` (repeatable)
+- `--recurring-rule 'from_wday=N,to_wday=N,from_time=HH:MM,to_time=HH:MM[,weeks=all|odd|even]'` (repeatable; `wday` 0=Sun–6=Sat)
+- `--expiry-action delete|archive|unpublish` — behavior when the schedule has fully expired
+
+For a quick "expire at X" use `--until` on `posts create *` / `publish` instead. See `pintomind posts schema time-schedule` for the JSON schema.
 
 ### Resources
 
