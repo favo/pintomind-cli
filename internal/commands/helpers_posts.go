@@ -204,24 +204,39 @@ func createResourceBackedPost(a *appctx.App, postType, resourceType string, reso
 	return nil
 }
 
-// publishToChannels publishes postID to each channel, applying area and fullScreen to all.
+// publishToChannels publishes postID to all channels in one request, applying area and fullScreen to all.
 func publishToChannels(a *appctx.App, postID int, channelIDs []int, area string, fullScreen bool) error {
-	postIDStr := strconv.Itoa(postID)
-	for _, chID := range channelIDs {
-		pub := map[string]any{"channel_id": chID}
-		if area != "" {
-			pub["area"] = area
+	if len(channelIDs) == 0 {
+		return nil
+	}
+	pub := map[string]any{"channel_ids": channelIDs}
+	if area != "" {
+		pub["area"] = area
+	}
+	if fullScreen {
+		pub["full_screen"] = true
+	}
+	var resp struct {
+		Success      bool                `json:"success"`
+		Publications []map[string]any    `json:"publications"`
+		Errors       map[string][]string `json:"errors"`
+	}
+	if err := a.Client.Post("/posts/"+strconv.Itoa(postID)+"/publications", map[string]any{"publication": pub}, &resp); err != nil {
+		return fmt.Errorf("publishing post %d: %w", postID, err)
+	}
+	if !a.JSONOutput {
+		for _, p := range resp.Publications {
+			if chID, ok := p["channel_id"].(float64); ok {
+				fmt.Printf("Published post %d to channel %d\n", postID, int(chID))
+			}
 		}
-		if fullScreen {
-			pub["full_screen"] = true
+	}
+	if len(resp.Errors) > 0 {
+		var msgs []string
+		for cid, errs := range resp.Errors {
+			msgs = append(msgs, fmt.Sprintf("channel %s: %s", cid, strings.Join(errs, "; ")))
 		}
-		var resp map[string]any
-		if err := a.Client.Post("/posts/"+postIDStr+"/publications", map[string]any{"publication": pub}, &resp); err != nil {
-			return fmt.Errorf("publishing to channel %d: %w", chID, err)
-		}
-		if !a.JSONOutput {
-			fmt.Printf("Published post %d to channel %d\n", postID, chID)
-		}
+		return fmt.Errorf("publish errors: %s", strings.Join(msgs, " | "))
 	}
 	return nil
 }

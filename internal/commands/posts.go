@@ -281,23 +281,24 @@ func newPostsPublicationsCmd() *cobra.Command {
 }
 
 func newPostsPublishCmd() *cobra.Command {
+	var channelIDs []int
 	var area string
 	var fullScreen bool
 
 	cmd := &cobra.Command{
-		Use:   "publish <post-id> <channel-id>",
-		Short: "Publish a post to a channel",
-		Example: `  pintomind posts publish 123 7
-  pintomind posts publish 123 7 --area F11
-  pintomind posts publish 123 7 --full-screen`,
-		Args: cobra.ExactArgs(2),
+		Use:   "publish <post-id> --channel-id N [--channel-id N ...]",
+		Short: "Publish a post to one or more channels",
+		Example: `  pintomind posts publish 123 --channel-id 7
+  pintomind posts publish 123 --channel-id 7 --channel-id 12
+  pintomind posts publish 123 --channel-id 7 --area F11
+  pintomind posts publish 123 --channel-id 7 --full-screen`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			channelID, err := strconv.Atoi(args[1])
-			if err != nil {
-				return fmt.Errorf("channel-id must be an integer")
+			if len(channelIDs) == 0 {
+				return fmt.Errorf("at least one --channel-id is required")
 			}
-			publication := map[string]any{"channel_id": channelID}
+			publication := map[string]any{"channel_ids": channelIDs}
 			if area != "" {
 				publication["area"] = area
 			}
@@ -313,22 +314,32 @@ func newPostsPublishCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&area, "area", "", "Channel area (defaults to the post's area; pass F11 for fullscreen)")
-	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen (alternative to --area F11)")
+	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel ID to publish to (repeatable; required)")
+	cmd.Flags().StringVar(&area, "area", "", "Channel area for all channels (defaults to the post's area; pass F11 for fullscreen)")
+	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen to all channels (alternative to --area F11)")
+	_ = cmd.MarkFlagRequired("channel-id")
 	return cmd
 }
 
 func newPostsUnpublishCmd() *cobra.Command {
+	var channelIDs []int
 	var force bool
 
 	cmd := &cobra.Command{
-		Use:   "unpublish <post-id> <publication-id>",
-		Short: "Remove a post's publication from a channel",
-		Args:  cobra.ExactArgs(2),
+		Use:   "unpublish <post-id> [--channel-id N ...]",
+		Short: "Unpublish a post from specific channels (or all channels if none specified)",
+		Example: `  pintomind posts unpublish 123                          # all channels
+  pintomind posts unpublish 123 --channel-id 7           # just channel 7
+  pintomind posts unpublish 123 --channel-id 7 --channel-id 12 --force`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
+			target := fmt.Sprintf("%d channel(s)", len(channelIDs))
+			if len(channelIDs) == 0 {
+				target = "ALL channels"
+			}
 			if !force {
-				fmt.Printf("Unpublish post %s publication %s? Pass --force to skip this prompt.\n", args[0], args[1])
+				fmt.Printf("Unpublish post %s from %s? Pass --force to skip this prompt.\n", args[0], target)
 				var confirm string
 				fmt.Print("Type 'yes' to confirm: ")
 				fmt.Scanln(&confirm)
@@ -337,13 +348,27 @@ func newPostsUnpublishCmd() *cobra.Command {
 					return nil
 				}
 			}
-			if err := a.Client.Delete("/posts/" + args[0] + "/publications/" + args[1]); err != nil {
+			var body any
+			if len(channelIDs) > 0 {
+				body = map[string]any{"channel_ids": channelIDs}
+			}
+			var resp map[string]any
+			if err := a.Client.DeleteWithBody("/posts/"+args[0]+"/publications", body, &resp); err != nil {
 				return err
 			}
-			fmt.Printf("Removed publication %s from post %s\n", args[1], args[0])
+			if a.JSONOutput {
+				printJSON(resp)
+				return nil
+			}
+			deleted := 0
+			if n, ok := resp["deleted_count"].(float64); ok {
+				deleted = int(n)
+			}
+			fmt.Printf("Unpublished post %s from %d channel(s)\n", args[0], deleted)
 			return nil
 		},
 	}
+	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel ID to unpublish from (repeatable; omit to unpublish from all)")
 	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
 	return cmd
 }

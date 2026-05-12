@@ -406,12 +406,14 @@ pintomind posts update 123 --data '{"sound":false}'
 Creating or updating a post does **not** put it on a channel — that is a separate step.
 
 ```bash
-pintomind posts publications <post-id>                   # list channel placements
-pintomind posts publish <post-id> <channel-id>           # publish to a channel
-pintomind posts publish <post-id> <channel-id> --area F11        # specific area
-pintomind posts publish <post-id> <channel-id> --full-screen     # fullscreen
-pintomind posts unpublish <post-id> <publication-id>     # remove placement
-pintomind posts unpublish <post-id> <publication-id> --force
+pintomind posts publications <post-id>                              # list channel placements
+pintomind posts publish <post-id> --channel-id 7                    # publish to a channel
+pintomind posts publish <post-id> --channel-id 7 --channel-id 12    # multiple channels in one call
+pintomind posts publish <post-id> --channel-id 7 --area F11         # specific area
+pintomind posts publish <post-id> --channel-id 7 --full-screen      # fullscreen
+pintomind posts unpublish <post-id>                                 # unpublish from ALL channels
+pintomind posts unpublish <post-id> --channel-id 7                  # unpublish from a specific channel
+pintomind posts unpublish <post-id> --channel-id 7 --channel-id 12 --force
 ```
 
 ### Typical end-to-end flow
@@ -424,7 +426,7 @@ pintomind media upload 42 ./photo.jpg --name "Lobby photo" --json | jq '.media.i
 pintomind posts create --type image --data '{"name":"Lobby","images":[{"media_id":<id>}],"duration_per_item":7}'
 
 # 3. Publish it to a channel
-pintomind posts publish <post-id> <channel-id>
+pintomind posts publish <post-id> --channel-id <channel-id>
 ```
 
 ## Poster Templates
@@ -464,7 +466,7 @@ pintomind resources update <resource-id> --data '{"poster_data": "{\"backgroundF
 pintomind resources update <resource-id> --data '{"media_box_ids": {"hero-image": 201}}'
 
 # 5. Publish to a channel
-pintomind posts publish <post-id> <channel-id>
+pintomind posts publish <post-id> --channel-id <channel-id>
 ```
 
 ### Creating a poster from scratch
@@ -668,7 +670,7 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Publish a photo to a channel in one step: `pintomind publish ./photo.jpg --channel-id 7`
 - Inspect valid resource fields: `pintomind schemas show text`
 - Inspect valid post fields: `pintomind schemas show post_image` (prefix `post_`)
-- Publishing is separate from raw `posts create`: use `posts publish <post-id> <channel-id>` or pass `--channel-id` to helper subcommands
+- Publishing is separate from raw `posts create`: use `posts publish <post-id> --channel-id <channel-id>` or pass `--channel-id` to helper subcommands
 - Image posts use `images:[{"media_id":...}]`; video posts use `video_media_id:<id>` (single integer) — neither uses `resource_ids`
 - Post fields are always flat inside `post` — no `options` sub-object
 - Use `--connection develop` to target the dev environment without changing your default.

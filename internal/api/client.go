@@ -162,6 +162,10 @@ func (c *Client) Delete(path string) error {
 	return c.do("DELETE", path, nil, nil)
 }
 
+func (c *Client) DeleteWithBody(path string, body any, out any) error {
+	return c.do("DELETE", path, body, out)
+}
+
 // PostMultipart sends a multipart/form-data POST. fields are plain form values;
 // files maps form field name → local file path.
 func (c *Client) PostMultipart(path string, fields map[string]string, files map[string]string, out any) error {

@@ -284,12 +284,14 @@ pintomind posts create --type poster --source-id <template-id> --data '{"name":"
 **Publications — manage where a post is displayed:**
 
 ```bash
-pintomind posts publications <post-id>          # List a post's channel publications
-pintomind posts publish <post-id> <channel-id>  # Publish to a channel
-pintomind posts publish <post-id> <channel-id> --area F11
-pintomind posts publish <post-id> <channel-id> --full-screen
-pintomind posts unpublish <post-id> <publication-id>
-pintomind posts unpublish <post-id> <publication-id> --force
+pintomind posts publications <post-id>                          # List a post's channel publications
+pintomind posts publish <post-id> --channel-id 7                # Publish to one channel
+pintomind posts publish <post-id> --channel-id 7 --channel-id 12  # Publish to multiple channels in one call
+pintomind posts publish <post-id> --channel-id 7 --area F11
+pintomind posts publish <post-id> --channel-id 7 --full-screen
+pintomind posts unpublish <post-id>                             # Unpublish from ALL channels
+pintomind posts unpublish <post-id> --channel-id 7              # Unpublish from specific channel(s)
+pintomind posts unpublish <post-id> --channel-id 7 --channel-id 12 --force
 ```
 
 **Time schedule — control when a post is visible:**
