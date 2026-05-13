@@ -912,6 +912,157 @@ func newPostsCreatePosterCmd() *cobra.Command {
 	return cmd
 }
 
+func newPostsCreateCounterCmd() *cobra.Command {
+	var name, title, template, countdownType string
+	var targetDate, targetTime, fromDate, fromTime string
+	var countdownFormat, timeZone string
+	var description, smallLabel, finishedTitle, finishedDescription, primaryColor string
+	var repeatable, repeatDelayUnit string
+	var duration, repeatDelay, finishedMediaBoxID int
+	var showTitle bool
+	var pf publishOpts
+	var uo untilOpts
+
+	validTemplates := map[string]bool{"circles": true, "simple": true, "blocks": true, "line": true, "rings": true, "radial": true}
+	validCountdownTypes := map[string]bool{"to_date": true, "from_date": true}
+	validFormats := map[string]bool{"DD:TT:MM:SS": true, "DD:TT:MM": true, "DD:TT": true, "DD": true}
+	validRepeatable := map[string]bool{"none": true, "daily": true, "weekly": true, "yearly": true}
+	validRepeatUnits := map[string]bool{"seconds": true, "minutes": true, "hours": true}
+
+	cmd := &cobra.Command{
+		Use:   "counter",
+		Short: "Create a counter (countdown / count-up) post",
+		Example: `  pintomind posts create counter --name "New Year" --countdown-type to_date --target-date 2027-01-01 --target-time 00:00 --channel-id 7
+  pintomind posts create counter --name "Since launch" --countdown-type from_date --from-date 2024-01-01 --template rings
+  pintomind posts create counter --name "Sale ends" --countdown-type to_date --target-date 2026-06-30 --target-time 23:59 --finished-media-box 42`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+
+			if cmd.Flags().Changed("template") && !validTemplates[template] {
+				return fmt.Errorf("invalid --template %q (want circles, simple, blocks, line, rings, or radial)", template)
+			}
+			if cmd.Flags().Changed("countdown-type") && !validCountdownTypes[countdownType] {
+				return fmt.Errorf("invalid --countdown-type %q (want to_date or from_date)", countdownType)
+			}
+			if cmd.Flags().Changed("countdown-format") && !validFormats[countdownFormat] {
+				return fmt.Errorf("invalid --countdown-format %q (want DD:TT:MM:SS, DD:TT:MM, DD:TT, or DD)", countdownFormat)
+			}
+			if cmd.Flags().Changed("repeatable") && !validRepeatable[repeatable] {
+				return fmt.Errorf("invalid --repeatable %q (want none, daily, weekly, or yearly)", repeatable)
+			}
+			if cmd.Flags().Changed("repeat-delay-unit") && !validRepeatUnits[repeatDelayUnit] {
+				return fmt.Errorf("invalid --repeat-delay-unit %q (want seconds, minutes, or hours)", repeatDelayUnit)
+			}
+
+			for _, d := range []struct{ flag, val string }{
+				{"target-date", targetDate}, {"from-date", fromDate},
+			} {
+				if cmd.Flags().Changed(d.flag) {
+					if err := validateDate(d.val); err != nil {
+						return fmt.Errorf("--%s: %w", d.flag, err)
+					}
+				}
+			}
+			for _, t := range []struct{ flag, val string }{
+				{"target-time", targetTime}, {"from-time", fromTime},
+			} {
+				if cmd.Flags().Changed(t.flag) {
+					if err := validateClock(t.val); err != nil {
+						return fmt.Errorf("--%s: %w", t.flag, err)
+					}
+				}
+			}
+
+			post := map[string]any{}
+			setStr := func(flag, key, val string) {
+				if cmd.Flags().Changed(flag) {
+					post[key] = val
+				}
+			}
+			setInt := func(flag, key string, val int) {
+				if cmd.Flags().Changed(flag) {
+					post[key] = val
+				}
+			}
+
+			setStr("name", "name", name)
+			setStr("title", "title", title)
+			setInt("duration", "duration", duration)
+			if cmd.Flags().Changed("show-title") {
+				post["show_title"] = showTitle
+			}
+			setStr("template", "template", template)
+			setStr("countdown-type", "countdown_type", countdownType)
+			setStr("target-date", "countdown_target_date", targetDate)
+			setStr("target-time", "countdown_target_time", targetTime)
+			setStr("from-date", "countdown_from_date", fromDate)
+			setStr("from-time", "countdown_from_time", fromTime)
+			setStr("countdown-format", "countdown_format", countdownFormat)
+			setStr("time-zone", "countdown_time_zone", timeZone)
+			setStr("description", "description", description)
+			setStr("small-label", "small_label", smallLabel)
+			setStr("finished-title", "finished_title", finishedTitle)
+			setStr("finished-description", "finished_description", finishedDescription)
+			setStr("primary-color", "primary_color", primaryColor)
+			setStr("repeatable", "repeatable", repeatable)
+			setStr("repeat-delay-unit", "repeat_delay_unit", repeatDelayUnit)
+			setInt("repeat-delay", "repeat_delay", repeatDelay)
+			setInt("finished-media-box", "countdown_finished_media_box_id", finishedMediaBoxID)
+
+			var postResp map[string]any
+			if err := a.Client.Post("/posts", map[string]any{"type": "counter", "post": post}, &postResp); err != nil {
+				return err
+			}
+
+			postID, err := intFromNestedResp(postResp, "post", "id")
+			if err != nil {
+				return err
+			}
+			if !a.JSONOutput {
+				fmt.Printf("Created counter post %d\n", postID)
+			}
+
+			if err := publishToChannels(a, postID, pf.channelIDs, pf.area, pf.fullScreen); err != nil {
+				return err
+			}
+
+			if err := applyUntilSchedule(a, postID, uo); err != nil {
+				return err
+			}
+
+			if a.JSONOutput {
+				printJSON(postResp)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&name, "name", "", "Post name")
+	cmd.Flags().StringVar(&title, "title", "", "Post title")
+	cmd.Flags().IntVar(&duration, "duration", 0, "Display duration in seconds (1–999)")
+	cmd.Flags().BoolVar(&showTitle, "show-title", false, "Show the post title on the slide")
+	cmd.Flags().StringVar(&template, "template", "", "Template: circles, simple, blocks, line, rings, or radial")
+	cmd.Flags().StringVar(&countdownType, "countdown-type", "", "Countdown direction: to_date or from_date")
+	cmd.Flags().StringVar(&targetDate, "target-date", "", "Target date (YYYY-MM-DD) for to_date countdowns")
+	cmd.Flags().StringVar(&targetTime, "target-time", "", "Target time (HH:MM) for to_date countdowns")
+	cmd.Flags().StringVar(&fromDate, "from-date", "", "Start date (YYYY-MM-DD) for from_date counters")
+	cmd.Flags().StringVar(&fromTime, "from-time", "", "Start time (HH:MM) for from_date counters")
+	cmd.Flags().StringVar(&countdownFormat, "countdown-format", "", "Unit granularity: DD:TT:MM:SS, DD:TT:MM, DD:TT, or DD")
+	cmd.Flags().StringVar(&timeZone, "time-zone", "", "IANA time zone (e.g. Europe/Oslo)")
+	cmd.Flags().StringVar(&description, "description", "", "Description text")
+	cmd.Flags().StringVar(&smallLabel, "small-label", "", "Small label text")
+	cmd.Flags().StringVar(&finishedTitle, "finished-title", "", "Title shown when the countdown reaches zero")
+	cmd.Flags().StringVar(&finishedDescription, "finished-description", "", "Description shown when the countdown reaches zero")
+	cmd.Flags().IntVar(&finishedMediaBoxID, "finished-media-box", 0, "Media box ID shown when the countdown finishes")
+	cmd.Flags().StringVar(&primaryColor, "primary-color", "", "Primary color (hex, e.g. '#FF8800')")
+	cmd.Flags().StringVar(&repeatable, "repeatable", "", "Repeat cycle: none, daily, weekly, or yearly")
+	cmd.Flags().IntVar(&repeatDelay, "repeat-delay", 0, "Repeat delay value")
+	cmd.Flags().StringVar(&repeatDelayUnit, "repeat-delay-unit", "", "Repeat delay unit: seconds, minutes, or hours")
+	addPublishFlags(cmd, &pf)
+	addUntilFlag(cmd, &uo)
+	return cmd
+}
+
 func resourceIDFromPostResp(resp map[string]any) (int, error) {
 	post, ok := resp["post"].(map[string]any)
 	if !ok {
