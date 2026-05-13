@@ -7,13 +7,13 @@ Command-line interface for the [Pintomind / Infoskjermen](https://infoskjermen.n
 ### One-line install (Linux and macOS)
 
 ```bash
-curl -fsSL https://dl.pintomind/pintomind-cli/install.sh | sh
+curl -fsSL https://dl.pintomind.com/pintomind-cli/install.sh | sh
 ```
 
 Downloads the pre-built binary for your OS and architecture to `~/.local/bin/pintomind`. Override the install directory with `INSTALL_DIR`:
 
 ```bash
-INSTALL_DIR=/usr/local/bin curl -fsSL https://dl.pintomind/pintomind-cli/install.sh | sh
+INSTALL_DIR=/usr/local/bin curl -fsSL https://dl.pintomind.com/pintomind-cli/install.sh | sh
 ```
 
 ### Build from source
