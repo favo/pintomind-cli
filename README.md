@@ -7,13 +7,13 @@ Command-line interface for the [Pintomind / Infoskjermen](https://infoskjermen.n
 ### One-line install (Linux and macOS)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/favo/pintomind-cli/main/install.sh | sh
+curl -fsSL https://dl.pintomind/pintomind-cli/install.sh | sh
 ```
 
 Downloads the pre-built binary for your OS and architecture to `~/.local/bin/pintomind`. Override the install directory with `INSTALL_DIR`:
 
 ```bash
-INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/favo/pintomind-cli/main/install.sh | sh
+INSTALL_DIR=/usr/local/bin curl -fsSL https://dl.pintomind/pintomind-cli/install.sh | sh
 ```
 
 ### Build from source
@@ -61,13 +61,13 @@ Config is stored in `~/.config/pintomind/config.json`. You can add multiple conn
 ### Add a connection
 
 ```bash
-pintomind connection add app.infoskjermen.no sk-your-key
+pintomind connection add main sk-your-key
 ```
 
-The first connection added becomes the default. The base URL defaults to `https://<name>`. Override it with `--url`:
+The first connection added becomes the default. You can add more connections if you have multiple api keys
 
 ```bash
-pintomind connection add develop sk-dev-key --url https://develop.infoskjermen.no
+pintomind connection add alternative-account sk-seondary-key
 ```
 
 ### Show active connection
@@ -87,13 +87,13 @@ The active default is marked with `*`.
 ### Switch default connection
 
 ```bash
-pintomind connection use develop
+pintomind connection use alternative-account
 ```
 
 ### Remove a connection
 
 ```bash
-pintomind connection remove develop
+pintomind connection remove alternative-account
 ```
 
 ### Override connection per command
@@ -101,7 +101,7 @@ pintomind connection remove develop
 Use `--connection` to target a specific connection without changing the default:
 
 ```bash
-pintomind --connection develop screens list
+pintomind --connection alternative-account screens list
 ```
 
 ---
