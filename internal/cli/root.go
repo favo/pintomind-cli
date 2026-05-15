@@ -46,11 +46,11 @@ func NewRootCmd() *cobra.Command {
 			client := api.New(domain.BaseURL, domain.APIKey)
 			client.Verbose = verbose
 			app := &appctx.App{
-				Config:            cfg,
-				Client:            client,
+				Config:           cfg,
+				Client:           client,
 				ActiveConnection: domainName,
-				JSONOutput:    jsonOutput,
-				Verbose:       verbose,
+				JSONOutput:       jsonOutput,
+				Verbose:          verbose,
 			}
 			cmd.SetContext(appctx.WithApp(cmd.Context(), app))
 			return nil
@@ -109,5 +109,5 @@ func isConnectionCmd(cmd *cobra.Command) bool {
 }
 
 func isUpdateCmd(cmd *cobra.Command) bool {
-	return cmd.Name() == "update"
+	return cmd.Name() == "update" && cmd.Parent() != nil && cmd.Parent().Parent() == nil
 }
