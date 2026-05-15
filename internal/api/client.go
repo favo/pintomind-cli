@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -83,12 +84,8 @@ func (c *Client) do(method, path string, body any, out any) error {
 	}
 
 	if resp.StatusCode >= 400 {
-		var errBody struct {
-			Error string `json:"error"`
-		}
-		_ = json.Unmarshal(data, &errBody)
-		if errBody.Error != "" {
-			return fmt.Errorf("API error %d: %s", resp.StatusCode, errBody.Error)
+		if message := apiErrorMessage(resp.StatusCode, data); message != "" {
+			return fmt.Errorf("API error %d: %s", resp.StatusCode, message)
 		}
 		return fmt.Errorf("API error %d", resp.StatusCode)
 	}
@@ -234,12 +231,8 @@ func (c *Client) doMultipart(method, path string, fields map[string]string, file
 		return err
 	}
 	if resp.StatusCode >= 400 {
-		var errBody struct {
-			Error string `json:"error"`
-		}
-		_ = json.Unmarshal(data, &errBody)
-		if errBody.Error != "" {
-			return fmt.Errorf("API error %d: %s", resp.StatusCode, errBody.Error)
+		if message := apiErrorMessage(resp.StatusCode, data); message != "" {
+			return fmt.Errorf("API error %d: %s", resp.StatusCode, message)
 		}
 		return fmt.Errorf("API error %d", resp.StatusCode)
 	}
@@ -249,6 +242,87 @@ func (c *Client) doMultipart(method, path string, fields map[string]string, file
 		}
 	}
 	return nil
+}
+
+func apiErrorMessage(statusCode int, data []byte) string {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 {
+		return ""
+	}
+
+	var payload any
+	if err := json.Unmarshal(data, &payload); err == nil {
+		if message := errorMessageFromPayload(payload); message != "" {
+			return message
+		}
+		if statusCode == http.StatusUnprocessableEntity {
+			return string(data)
+		}
+		return ""
+	}
+
+	if statusCode == http.StatusUnprocessableEntity {
+		return string(data)
+	}
+	return ""
+}
+
+func errorMessageFromPayload(payload any) string {
+	switch value := payload.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case []any:
+		return joinErrorMessages(value)
+	case map[string]any:
+		for _, key := range []string{"error", "message", "errors", "detail", "details"} {
+			if raw, ok := value[key]; ok {
+				if key == "errors" {
+					return validationErrorsMessage(raw)
+				}
+				if message := errorMessageFromPayload(raw); message != "" {
+					return message
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func validationErrorsMessage(payload any) string {
+	switch value := payload.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(value))
+		for key := range value {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		messages := make([]string, 0, len(keys))
+		for _, key := range keys {
+			message := errorMessageFromPayload(value[key])
+			if message == "" {
+				continue
+			}
+			if key == "base" {
+				messages = append(messages, message)
+				continue
+			}
+			messages = append(messages, fmt.Sprintf("%s: %s", key, message))
+		}
+		return strings.Join(messages, "; ")
+	default:
+		return errorMessageFromPayload(payload)
+	}
+}
+
+func joinErrorMessages(values []any) string {
+	messages := make([]string, 0, len(values))
+	for _, value := range values {
+		if message := errorMessageFromPayload(value); message != "" {
+			messages = append(messages, message)
+		}
+	}
+	return strings.Join(messages, "; ")
 }
 
 func (c *Client) PutDirectUpload(uploadURL string, headers map[string]string, body io.Reader, contentLength int64) error {
