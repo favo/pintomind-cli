@@ -127,6 +127,8 @@ pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
 pintomind publish https://example.com/banner.jpg --channel-id 7 --channel-id 8
 pintomind publish ./photo.jpg --channel-id 7 --duration 10 --full-screen
 pintomind publish ./photo.jpg --channel-id 7 --media-collection 42  # specific collection
+pintomind publish ./photo.jpg --channel-id 7 --template fullpane
+pintomind publish ./photo.jpg --channel-id 7 --background-media-box 301
 pintomind publish ./flyer.jpg --channel-id 7 --until 2026-06-30T17:00
 ```
 
@@ -241,7 +243,7 @@ pintomind posts delete <id> --force
 
 **Create posts with typed subcommands:**
 
-Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
+Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, `--background-media-box <id>` (MediaBox id used as the post background — create one first with `pintomind media-boxes create ...`), plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
 
 ```bash
 # Image post — upload files and/or reference existing media IDs
@@ -249,6 +251,7 @@ pintomind posts create image --name "Gallery" --image ./a.jpg --image ./b.jpg --
 pintomind posts create image --name "Promo" --media 42 --media 43 --duration 10
 pintomind posts create image --name "Mix" --image ./photo.jpg --media 55 --channel-id 7
 pintomind posts create image --image ./deck.pdf  # PDF is auto-extracted into pages
+pintomind posts create image --image ./photo.jpg --template fullpane  # center | maxpane | fullpane | image_grid
 
 # Plain text post
 pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
@@ -276,10 +279,14 @@ pintomind posts create poster --name "Brand poster" --source-id <template-id> --
 **Raw create (any type, full JSON control):**
 
 ```bash
-pintomind posts create --type image --data '{"name":"Spring","duration_per_item":7,"images":[{"media_id":42}]}'
-pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","body":"<p>World</p>","media_box_ids":[201,202]}'
+pintomind posts create --type image --data '{"name":"Spring","duration_per_item":7,"images":[{"media_id":42}],"template":"fullpane"}'
+pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","body":"<p>World</p>","media_box_ids":[201,202],"background_id":301}'
 pintomind posts create --type poster --source-id <template-id> --data '{"name":"My poster"}'
 ```
+
+Image templates: `center` (centered, full image), `maxpane` (fill, full image), `fullpane` (fill, cropped), `image_grid` (mosaic). The legacy `aspect_ratio` / `grid_layout` / `variation` fields are no longer accepted.
+
+Any post type accepts `background_id` (a MediaBox id) as a post background. Pass `null` in `posts update --data` to clear.
 
 **Publications — manage where a post is displayed:**
 

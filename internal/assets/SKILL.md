@@ -341,17 +341,19 @@ pintomind schemas show post_plain
 pintomind schemas show post_calendar
 ```
 
-Common shared fields: `name`, `title`, `duration`, `show_title`, `area`.
+Common shared fields: `name`, `title`, `duration`, `show_title`, `area`, `background_id` (a MediaBox id used as post background — create one with `pintomind media-boxes create ...`; pass `null` on update to clear).
+
+Typed `posts create` subcommands also accept `--background-media-box <id>` and the `image` subcommand accepts `--template center|maxpane|fullpane|image_grid`.
 
 ```bash
 # Image post — use images[] with media_id values from `pintomind media upload`
+# template: center | maxpane | fullpane | image_grid (legacy aspect_ratio/grid_layout/variation removed)
 pintomind posts create --type image --data '{
   "name":"Spring campaign",
   "title":"New collection",
   "duration_per_item":7,
   "images":[{"media_id":42},{"media_id":43}],
-  "aspect_ratio":"fill",
-  "grid_layout":1
+  "template":"fullpane"
 }'
 
 # Video post — video_media_id is a single integer
