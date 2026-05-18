@@ -4,25 +4,34 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 type Webhook struct {
-	ID              int      `json:"id"`
-	URL             string   `json:"url"`
-	Events          []string `json:"events"`
-	ScreenID        *int     `json:"screen_id"`
-	Enabled         bool     `json:"enabled"`
-	LastDeliveredAt string   `json:"last_delivered_at"`
-	CreatedAt       string   `json:"created_at"`
-	UpdatedAt       string   `json:"updated_at"`
+	ID              int    `json:"id"`
+	Event           string `json:"event"`
+	URL             string `json:"url"`
+	ScreenID        *int   `json:"screen_id"`
+	Enabled         bool   `json:"enabled"`
+	LastDeliveredAt string `json:"last_delivered_at"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
 }
 
 type WebhooksResponse struct {
 	Total int       `json:"total"`
 	Items []Webhook `json:"items"`
+}
+
+type WebhookEvent struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Family      string `json:"family"`
+}
+
+type WebhookEventsResponse struct {
+	Events []WebhookEvent `json:"events"`
 }
 
 func NewWebhooksCmd() *cobra.Command {
@@ -31,6 +40,7 @@ func NewWebhooksCmd() *cobra.Command {
 		Short: "Manage outbound webhooks",
 	}
 	cmd.AddCommand(newWebhooksListCmd())
+	cmd.AddCommand(newWebhooksEventsCmd())
 	cmd.AddCommand(newWebhooksShowCmd())
 	cmd.AddCommand(newWebhooksCreateCmd())
 	cmd.AddCommand(newWebhooksUpdateCmd())
@@ -72,20 +82,44 @@ func newWebhooksListCmd() *cobra.Command {
 				}
 				rows[i] = []string{
 					strconv.Itoa(w.ID),
+					w.Event,
 					w.URL,
-					strings.Join(w.Events, ","),
 					screen,
 					strconv.FormatBool(w.Enabled),
 					w.LastDeliveredAt,
 				}
 			}
-			printTable(cmd, []string{"ID", "URL", "EVENTS", "SCREEN", "ENABLED", "LAST DELIVERED"}, rows)
+			printTable(cmd, []string{"ID", "EVENT", "URL", "SCREEN", "ENABLED", "LAST DELIVERED"}, rows)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (created_at|updated_at, e.g. created_at:desc)")
 	addPaginationFlags(cmd)
 	return cmd
+}
+
+func newWebhooksEventsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "events",
+		Short: "List available webhook event names",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			var resp WebhookEventsResponse
+			if err := a.Client.Get("/webhooks/events", nil, &resp); err != nil {
+				return err
+			}
+			if a.JSONOutput {
+				printJSON(resp)
+				return nil
+			}
+			rows := make([][]string, len(resp.Events))
+			for i, e := range resp.Events {
+				rows[i] = []string{e.Name, e.Family, e.Description}
+			}
+			printTable(cmd, []string{"NAME", "FAMILY", "DESCRIPTION"}, rows)
+			return nil
+		},
+	}
 }
 
 func newWebhooksShowCmd() *cobra.Command {
@@ -107,23 +141,23 @@ func newWebhooksShowCmd() *cobra.Command {
 
 func newWebhooksCreateCmd() *cobra.Command {
 	var (
+		event      string
 		webhookURL string
-		events     []string
 		screenID   int
 		disabled   bool
 	)
 
 	cmd := &cobra.Command{
-		Use:   "create --url <https-url> --events screen.online,screen.offline",
+		Use:   "create --event <name> --url <https-url>",
 		Short: "Create a webhook (response includes the secret — store it)",
 		Example: `  pintomind webhooks create \
-    --url "https://example.com/hooks/pintomind" \
-    --events screen.online,screen.offline`,
+    --event screen.offline \
+    --url "https://example.com/hooks/pintomind"`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			body := map[string]any{
-				"url":    webhookURL,
-				"events": events,
+				"event": event,
+				"url":   webhookURL,
 			}
 			if cmd.Flags().Changed("screen-id") {
 				body["screen_id"] = screenID
@@ -139,34 +173,30 @@ func newWebhooksCreateCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&event, "event", "", "Event name (see 'webhooks events') (required)")
 	cmd.Flags().StringVar(&webhookURL, "url", "", "Destination URL (required)")
-	cmd.Flags().StringSliceVar(&events, "events", nil, "Comma-separated events (screen.online,screen.offline) (required)")
-	cmd.Flags().IntVar(&screenID, "screen-id", 0, "Scope to one screen; omit for all screens on the account")
+	cmd.Flags().IntVar(&screenID, "screen-id", 0, "Scope to one screen (only for screen.online/screen.offline)")
 	cmd.Flags().BoolVar(&disabled, "disabled", false, "Create webhook disabled (default enabled)")
+	_ = cmd.MarkFlagRequired("event")
 	_ = cmd.MarkFlagRequired("url")
-	_ = cmd.MarkFlagRequired("events")
 	return cmd
 }
 
 func newWebhooksUpdateCmd() *cobra.Command {
 	var (
 		webhookURL string
-		events     []string
 		enabled    bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "update <id>",
-		Short: "Update a webhook",
+		Short: "Update a webhook (url, enabled)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
 			body := map[string]any{}
 			if cmd.Flags().Changed("url") {
 				body["url"] = webhookURL
-			}
-			if cmd.Flags().Changed("events") {
-				body["events"] = events
 			}
 			if cmd.Flags().Changed("enabled") {
 				body["enabled"] = enabled
@@ -183,7 +213,6 @@ func newWebhooksUpdateCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&webhookURL, "url", "", "Destination URL")
-	cmd.Flags().StringSliceVar(&events, "events", nil, "Comma-separated events")
 	cmd.Flags().BoolVar(&enabled, "enabled", true, "Enable or disable delivery")
 	return cmd
 }
@@ -219,26 +248,18 @@ func newWebhooksDeleteCmd() *cobra.Command {
 }
 
 func newWebhooksTestCmd() *cobra.Command {
-	var event string
-
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "test <id>",
 		Short: "Enqueue a synthetic delivery against the webhook URL",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			var body map[string]any
-			if event != "" {
-				body = map[string]any{"event": event}
-			}
 			var resp map[string]any
-			if err := a.Client.Post("/webhooks/"+args[0]+"/test", body, &resp); err != nil {
+			if err := a.Client.Post("/webhooks/"+args[0]+"/test", nil, &resp); err != nil {
 				return err
 			}
 			printJSON(resp)
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&event, "event", "", "Event to simulate (default screen.online)")
-	return cmd
 }
