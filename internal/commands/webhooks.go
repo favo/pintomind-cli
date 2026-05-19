@@ -46,6 +46,70 @@ func NewWebhooksCmd() *cobra.Command {
 	cmd.AddCommand(newWebhooksUpdateCmd())
 	cmd.AddCommand(newWebhooksDeleteCmd())
 	cmd.AddCommand(newWebhooksTestCmd())
+	cmd.AddCommand(newWebhooksDeliveriesCmd())
+	return cmd
+}
+
+type WebhookDelivery struct {
+	ID           int    `json:"id"`
+	WebhookID    int    `json:"webhook_id"`
+	ScreenID     *int   `json:"screen_id"`
+	ResourceID   *int   `json:"resource_id"`
+	Attempt      int    `json:"attempt"`
+	HTTPStatus   *int   `json:"http_status"`
+	Successful   bool   `json:"successful"`
+	ErrorMessage string `json:"error_message"`
+	DeliveredAt  string `json:"delivered_at"`
+	CreatedAt    string `json:"created_at"`
+	Payload      any    `json:"payload"`
+}
+
+type WebhookDeliveriesResponse struct {
+	Total int               `json:"total"`
+	Items []WebhookDelivery `json:"items"`
+}
+
+func newWebhooksDeliveriesCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "deliveries <webhook-id>",
+		Short: "List past deliveries for a webhook (newest first)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			q := url.Values{}
+			applyPagination(cmd, q)
+
+			var resp WebhookDeliveriesResponse
+			if err := a.Client.Get("/webhooks/"+args[0]+"/deliveries", q, &resp); err != nil {
+				return err
+			}
+
+			if a.JSONOutput {
+				printJSON(resp)
+				return nil
+			}
+
+			fmt.Printf("Total: %d\n\n", resp.Total)
+			rows := make([][]string, len(resp.Items))
+			for i, d := range resp.Items {
+				status := "-"
+				if d.HTTPStatus != nil {
+					status = strconv.Itoa(*d.HTTPStatus)
+				}
+				rows[i] = []string{
+					strconv.Itoa(d.ID),
+					strconv.Itoa(d.Attempt),
+					status,
+					strconv.FormatBool(d.Successful),
+					d.DeliveredAt,
+					d.ErrorMessage,
+				}
+			}
+			printTable(cmd, []string{"ID", "ATTEMPT", "HTTP", "OK", "DELIVERED AT", "ERROR"}, rows)
+			return nil
+		},
+	}
+	addPaginationFlags(cmd)
 	return cmd
 }
 
