@@ -83,6 +83,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(commands.NewThemesCmd())
 	root.AddCommand(commands.NewColorPalettesCmd())
 	root.AddCommand(commands.NewFontFamiliesCmd())
+	root.AddCommand(commands.NewWebhooksCmd())
 
 	root.InitDefaultCompletionCmd()
 
