@@ -130,7 +130,10 @@ func CheckForUpdate(version string) {
 		_ = os.WriteFile(cacheFile, []byte(latest), 0644)
 	}
 
-	current := "v" + version
+	current := version
+	if !strings.HasPrefix(current, "v") {
+		current = "v" + current
+	}
 	if latest != "" && latest != current {
 		fmt.Fprintf(os.Stderr, "Update available: %s → %s  (run: pintomind update)\n", current, latest)
 	}
