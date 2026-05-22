@@ -71,11 +71,11 @@ func (c *Config) ActiveDomain(override string) (string, Domain, error) {
 		name = c.DefaultDomain
 	}
 	if name == "" {
-		return "", Domain{}, fmt.Errorf("no account configured — run: pintomind config add app.infoskjermen.no <api-key>")
+		return "", Domain{}, fmt.Errorf("no connection configured — run: pintomind connection add <name> <api-key>")
 	}
 	d, ok := c.Domains[name]
 	if !ok {
-		return "", Domain{}, fmt.Errorf("account %q not found in config", name)
+		return "", Domain{}, fmt.Errorf("connection %q not found in config", name)
 	}
 	return name, d, nil
 }
