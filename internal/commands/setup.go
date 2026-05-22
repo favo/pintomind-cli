@@ -16,6 +16,7 @@ func NewSetupCmd(root *cobra.Command) *cobra.Command {
 		Short: "Set up integrations for pintomind",
 		Long:  "Run all setup steps or individual ones. Installs AI-agent skills and shell completions.",
 	}
+	cmd.AddCommand(newSetupInitCmd(root))
 	cmd.AddCommand(newSetupClaudeCmd())
 	cmd.AddCommand(newSetupCodexCmd())
 	cmd.AddCommand(newSetupCompletionCmd(root))

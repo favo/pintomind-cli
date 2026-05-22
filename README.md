@@ -38,25 +38,30 @@ pintomind update            # self-update to the latest release
 
 ## First-time setup
 
-Run all setup steps in one command:
+The fastest way to get started is the guided wizard — it walks you through adding a connection, verifies your API key, and (optionally) installs the AI skills and shell completion:
 
 ```bash
-pintomind setup all
+pintomind setup init
 ```
 
-Or run them individually:
+That's it. You can re-run any individual step later:
 
 ```bash
 pintomind setup claude       # install the Claude Code skill
 pintomind setup codex        # install the Codex / ChatGPT-compatible skill
 pintomind setup completion   # install shell tab-completion
+pintomind setup all          # all three at once (no connection prompt)
 ```
+
+If you'd rather add the connection by hand, see [Connections](#connections) below.
 
 ---
 
 ## Connections
 
 Config is stored in `~/.config/pintomind/config.json`. You can add multiple connections with separate API keys — useful for keeping production and development environments apart.
+
+> Tip: `pintomind setup init` is the easiest way to add your first connection. The commands below are for managing connections after that.
 
 ### Add a connection
 

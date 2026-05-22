@@ -28,8 +28,8 @@ func NewRootCmd() *cobra.Command {
 			if !isUpdateCmd(cmd) {
 				commands.CheckForUpdate(version)
 			}
-			// Skip API client setup for config/update subcommands
-			if isConnectionCmd(cmd) || isUpdateCmd(cmd) {
+			// Skip API client setup for config/update/setup subcommands
+			if isConnectionCmd(cmd) || isUpdateCmd(cmd) || isSetupCmd(cmd) {
 				return nil
 			}
 
@@ -131,4 +131,16 @@ func isConnectionCmd(cmd *cobra.Command) bool {
 
 func isUpdateCmd(cmd *cobra.Command) bool {
 	return cmd.Name() == "update" && cmd.Parent() != nil && cmd.Parent().Parent() == nil
+}
+
+// isSetupCmd returns true when cmd is or lives under the "setup" command.
+func isSetupCmd(cmd *cobra.Command) bool {
+	c := cmd
+	for c != nil {
+		if c.Name() == "setup" {
+			return true
+		}
+		c = c.Parent()
+	}
+	return false
 }
