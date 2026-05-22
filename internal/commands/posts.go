@@ -158,12 +158,29 @@ func newPostsCreateCmd() *cobra.Command {
 	var postType, data, sourceID string
 
 	cmd := &cobra.Command{
-		Use:   "create --type <type> --data '<json>'",
-		Short: "Create a post",
-		Example: `  pintomind posts create --type image --data '{"name":"Spring","title":"New collection","duration_per_item":7,"images":[{"media_id":42}]}'
-  pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","body":"<p>World</p>","media_box_ids":[201,202]}'
-  pintomind posts create --type poster --source-id <template-id> --data '{"name":"My poster"}'`,
+		Use:   "create <type> [flags]",
+		Short: "Create a post (use a type subcommand below)",
+		Long: `Create a post.
+
+Pick the subcommand for the post type you want — each one has friendly flags
+(--name, --image, --channel-id, etc.) and an interactive mode (-i):
+
+  pintomind posts create image -i
+  pintomind posts create plain --heading "<p>Hi</p>" --body "<p>World</p>"
+  pintomind posts create feed --url https://example.com/feed.xml --name "News"
+  pintomind posts create poster --source-id 42 --name "My poster"
+
+Advanced: pass raw API JSON with --type and --data (skips validation helpers).`,
+		Example: `  pintomind posts create image --name "Spring" --image ./a.jpg --channel-id 7
+  pintomind posts create plain -i
+  pintomind posts create feed --url https://example.com/feed.xml
+
+  # Advanced (raw JSON):
+  pintomind posts create --type image --data '{"name":"Spring","images":[{"media_id":42}]}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if postType == "" {
+				return fmt.Errorf("specify a post type subcommand (e.g. `posts create image`) or pass --type with --data — see `posts create --help`")
+			}
 			a := app(cmd)
 			body := map[string]any{"type": postType}
 			if data != "" {
@@ -184,10 +201,9 @@ func newPostsCreateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&postType, "type", "", "Post type alias (required)")
-	cmd.Flags().StringVar(&data, "data", "", "Post fields as JSON")
+	cmd.Flags().StringVar(&postType, "type", "", "Advanced: post type alias for raw JSON mode (use a subcommand instead)")
+	cmd.Flags().StringVar(&data, "data", "", "Advanced: raw post fields as JSON (paired with --type)")
 	cmd.Flags().StringVar(&sourceID, "source-id", "", "Duplicate a network poster template (poster type only)")
-	_ = cmd.MarkFlagRequired("type")
 	return cmd
 }
 

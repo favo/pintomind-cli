@@ -61,30 +61,50 @@ func NewRootCmd() *cobra.Command {
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show HTTP request and response details")
 
-	root.AddCommand(commands.NewAPICmd())
-	root.AddCommand(commands.NewVersionCmd(version))
-	root.AddCommand(commands.NewUpdateCmd(version))
-	root.AddCommand(commands.NewPublishCmd())
-	root.AddCommand(commands.NewSetupCmd(root))
-	root.AddCommand(commands.NewConnectionCmd())
-	root.AddCommand(commands.NewMeCmd())
-	root.AddCommand(commands.NewNetworkCmd())
-	root.AddCommand(commands.NewScreensCmd())
-	root.AddCommand(commands.NewChannelsCmd())
-	root.AddCommand(commands.NewResourcesCmd())
-	root.AddCommand(commands.NewMediaCollectionsCmd())
-	root.AddCommand(commands.NewMediaCmd())
-	root.AddCommand(commands.NewTasksCmd())
-	root.AddCommand(commands.NewMediaBoxesCmd())
-	root.AddCommand(commands.NewIconsCmd())
-	root.AddCommand(commands.NewPostsCmd())
-	root.AddCommand(commands.NewPosterTemplatesCmd())
-	root.AddCommand(commands.NewSchemasCmd())
-	root.AddCommand(commands.NewThemesCmd())
-	root.AddCommand(commands.NewColorPalettesCmd())
-	root.AddCommand(commands.NewFontFamiliesCmd())
-	root.AddCommand(commands.NewWebhooksCmd())
+	const (
+		groupAPI  = "api"
+		groupTool = "tool"
+	)
+	root.AddGroup(
+		&cobra.Group{ID: groupAPI, Title: "Available commands:"},
+		&cobra.Group{ID: groupTool, Title: "Local commands:"},
+	)
 
+	addAPI := func(c *cobra.Command) {
+		c.GroupID = groupAPI
+		root.AddCommand(c)
+	}
+	addTool := func(c *cobra.Command) {
+		c.GroupID = groupTool
+		root.AddCommand(c)
+	}
+
+	addAPI(commands.NewScreensCmd())
+	addAPI(commands.NewChannelsCmd())
+	addAPI(commands.NewPostsCmd())
+	addAPI(commands.NewMediaCmd())
+	addAPI(commands.NewMediaCollectionsCmd())
+	addAPI(commands.NewMediaBoxesCmd())
+	addAPI(commands.NewResourcesCmd())
+	addAPI(commands.NewPosterTemplatesCmd())
+	addAPI(commands.NewThemesCmd())
+	addAPI(commands.NewColorPalettesCmd())
+	addAPI(commands.NewFontFamiliesCmd())
+	addAPI(commands.NewIconsCmd())
+	addAPI(commands.NewWebhooksCmd())
+	addAPI(commands.NewTasksCmd())
+	addAPI(commands.NewSchemasCmd())
+	addAPI(commands.NewMeCmd())
+	addAPI(commands.NewNetworkCmd())
+	addAPI(commands.NewAPICmd())
+
+	addTool(commands.NewConnectionCmd())
+	addTool(commands.NewSetupCmd(root))
+	addTool(commands.NewUpdateCmd(version))
+	addTool(commands.NewVersionCmd(version))
+
+	root.SetHelpCommandGroupID(groupTool)
+	root.SetCompletionCommandGroupID(groupTool)
 	root.InitDefaultCompletionCmd()
 
 	return root

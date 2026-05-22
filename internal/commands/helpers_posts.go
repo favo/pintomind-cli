@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -269,58 +268,6 @@ func intFromNestedResp(resp map[string]any, outer, inner string) (int, error) {
 		return 0, fmt.Errorf("unexpected response: %s.%s not numeric", outer, inner)
 	}
 	return int(f), nil
-}
-
-// NewPublishCmd is a top-level shorthand: upload a file and publish it as an image post.
-func NewPublishCmd() *cobra.Command {
-	var name, template string
-	var collectionID, bgID int
-	var duration int
-	var pf publishOpts
-	var uo untilOpts
-
-	cmd := &cobra.Command{
-		Use:   "publish <file-or-url>",
-		Short: "Upload a file and publish it as an image post to one or more channels",
-		Example: `  pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
-  pintomind publish https://example.com/photo.jpg --channel-id 7 --channel-id 8 --name "Remote image"
-  pintomind publish ./flyer.jpg --channel-id 7 --until 2026-06-30T17:00`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			a := app(cmd)
-			input := args[0]
-
-			colID := collectionID
-			if colID == 0 {
-				id, err := findDefaultCollection(a, "image")
-				if err != nil {
-					return err
-				}
-				colID = id
-			}
-
-			uploadedIDs, err := uploadFileToCollection(a, input, strconv.Itoa(colID))
-			if err != nil {
-				return err
-			}
-
-			postName := name
-			if postName == "" {
-				postName = filepath.Base(input)
-			}
-
-			return createAndPublishImagePost(a, postName, uploadedIDs, duration, template, bgID, pf, uo)
-		},
-	}
-
-	cmd.Flags().StringVar(&name, "name", "", "Post name (defaults to filename)")
-	cmd.Flags().IntVar(&collectionID, "media-collection", 0, "Media collection ID for upload (defaults to default image collection)")
-	cmd.Flags().IntVar(&duration, "duration", 7, "Seconds per slide")
-	cmd.Flags().StringVar(&template, "template", "", "Image post template: center, maxpane, fullpane, image_grid")
-	addPublishFlags(cmd, &pf)
-	addBackgroundFlag(cmd, &bgID)
-	addUntilFlag(cmd, &uo)
-	return cmd
 }
 
 // newPostsCreateImageCmd creates an image post, optionally uploading files first.

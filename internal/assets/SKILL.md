@@ -274,20 +274,6 @@ All `posts create <type>` helpers accept:
 
 `--until` is evaluated in each channel's local time zone. For richer schedules (recurring weekly windows, multiple periods, or other expiry actions) use `pintomind posts schedule set` after creating the post.
 
-### Top-level `publish` shorthand
-
-One-liner for the most common flow: upload a file and publish to a channel.
-
-```bash
-pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
-pintomind publish https://example.com/photo.jpg --channel-id 7 --channel-id 8
-pintomind publish ./photo.jpg --channel-id 7 --media-collection 12 --duration 10
-pintomind publish ./flyer.jpg --channel-id 7 --until 2026-06-30T17:00
-pintomind publish ./flyer.jpg --channel-id 7 --until 2026-06-30
-```
-
-Auto-detects the default image collection. Use `--collection-id` to override. `--until` behaves the same as on `posts create *`.
-
 ### Time schedule
 
 Each post can have at most one time schedule that controls when it is visible. A schedule combines:
@@ -669,7 +655,7 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Create a palette and use it in a theme: `pintomind color-palettes create --name "Brand" --primary-color "#1F8A8A"` then `pintomind themes update <theme-id> --data '{"color_palette_id":<id>}'`
 - Add a Google Font: `pintomind font-families create remote-css --name "Inter" --url "https://fonts.googleapis.com/css2?family=Inter:wght@400;700"`
 - Upload a file to media: `pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"`
-- Publish a photo to a channel in one step: `pintomind publish ./photo.jpg --channel-id 7`
+- Publish a photo to a channel in one step: `pintomind posts create image --image ./photo.jpg --channel-id 7`
 - Inspect valid resource fields: `pintomind schemas show text`
 - Inspect valid post fields: `pintomind schemas show post_image` (prefix `post_`)
 - Publishing is separate from raw `posts create`: use `posts publish <post-id> --channel-id <channel-id>` or pass `--channel-id` to helper subcommands

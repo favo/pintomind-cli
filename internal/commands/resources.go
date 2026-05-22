@@ -119,10 +119,28 @@ func newResourcesCreateCmd() *cobra.Command {
 	var data string
 
 	cmd := &cobra.Command{
-		Use:   "create --type <type> --data '<json>'",
-		Short: "Create a resource",
-		Example: `  pintomind resources create --type text --data '{"label":"Hello","text":"World"}'`,
+		Use:   "create <type> [flags]",
+		Short: "Create a resource (use a type subcommand below)",
+		Long: `Create a resource.
+
+Pick the subcommand for the resource type you want — each one has friendly
+flags (--label, --url, --text, etc.) tailored to that type:
+
+  pintomind resources create text --label "Hello" --text "World"
+  pintomind resources create feed --url https://example.com/feed.xml --label "News"
+  pintomind resources create calendar --url https://example.com/cal.ics --label "Events"
+  pintomind resources create qr-code --url https://example.com --label "Site"
+
+Advanced: pass raw API JSON with --type and --data (skips validation helpers).`,
+		Example: `  pintomind resources create text --label "Hello" --text "World"
+  pintomind resources create feed --url https://example.com/feed.xml --label "News"
+
+  # Advanced (raw JSON):
+  pintomind resources create --type text --data '{"label":"Hello","text":"World"}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if resourceType == "" {
+				return fmt.Errorf("specify a resource type subcommand (e.g. `resources create text`) or pass --type with --data — see `resources create --help`")
+			}
 			a := app(cmd)
 			var resource map[string]any
 			if err := json.Unmarshal([]byte(data), &resource); err != nil {
@@ -140,10 +158,8 @@ func newResourcesCreateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&resourceType, "type", "", "Resource type alias (required)")
-	cmd.Flags().StringVar(&data, "data", "", "Resource fields as JSON (required)")
-	_ = cmd.MarkFlagRequired("type")
-	_ = cmd.MarkFlagRequired("data")
+	cmd.Flags().StringVar(&resourceType, "type", "", "Advanced: resource type alias for raw JSON mode (use a subcommand instead)")
+	cmd.Flags().StringVar(&data, "data", "", "Advanced: raw resource fields as JSON (paired with --type)")
 	return cmd
 }
 

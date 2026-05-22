@@ -120,19 +120,16 @@ pintomind --connection alternative-account screens list
 
 ### Quick publish
 
-Upload a file or URL and immediately publish it as an image post to one or more channels:
+Upload a file or URL and publish it as an image post in one command — use `posts create image` with `--channel-id`:
 
 ```bash
-pintomind publish ./photo.jpg --channel-id 7 --name "Lobby photo"
-pintomind publish https://example.com/banner.jpg --channel-id 7 --channel-id 8
-pintomind publish ./photo.jpg --channel-id 7 --duration 10 --full-screen
-pintomind publish ./photo.jpg --channel-id 7 --media-collection 42  # specific collection
-pintomind publish ./photo.jpg --channel-id 7 --template fullpane
-pintomind publish ./photo.jpg --channel-id 7 --background-media-box 301
-pintomind publish ./flyer.jpg --channel-id 7 --until 2026-06-30T17:00
+pintomind posts create image --image ./photo.jpg --channel-id 7 --name "Lobby photo"
+pintomind posts create image --image https://example.com/banner.jpg --channel-id 7 --channel-id 8
+pintomind posts create image --image ./photo.jpg --channel-id 7 --duration 10 --full-screen
+pintomind posts create image --image ./flyer.jpg --channel-id 7 --until 2026-06-30T17:00
 ```
 
-The CLI uploads the file, waits for processing, creates the image post, and publishes it — all in one command. Use `--until <YYYY-MM-DD[THH:MM]>` to auto-expire the post (unpublishes it when the time is reached; for other expiry actions use `posts schedule set` after creation).
+Uploads the file, waits for processing, creates the post, and publishes it. Use `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublishes when the time is reached; for other expiry actions use `posts schedule set` after creation). See the [Posts](#posts) section for full flag reference.
 
 ### Identity
 
@@ -424,7 +421,7 @@ pintomind media create <collection-id> --source <signed-id> --extract-pages --wa
 
 ### Tasks
 
-Media uploads are processed asynchronously. `pintomind publish` and `posts create image` wait automatically. For raw uploads (`media upload` / `media create` without `--wait`), inspect or wait for the task manually:
+Media uploads are processed asynchronously. `posts create image` waits automatically. For raw uploads (`media upload` / `media create` without `--wait`), inspect or wait for the task manually:
 
 ```bash
 pintomind tasks show <id>    # Current state: pending / processing / completed / failed

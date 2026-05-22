@@ -27,39 +27,59 @@ func NewScreensCmd() *cobra.Command {
 		Short: "Manage screens",
 	}
 
-	// Read
-	cmd.AddCommand(newScreensListCmd())
-	cmd.AddCommand(newScreensShowCmd())
-	cmd.AddCommand(newScreensStatsCmd())
-	cmd.AddCommand(newScreensWatchCmd())
-	cmd.AddCommand(newScreensWaitOnlineCmd())
+	const (
+		groupCommands = "commands"
+		groupActions  = "actions"
+		groupEffects  = "effects"
+	)
+	cmd.AddGroup(
+		&cobra.Group{ID: groupCommands, Title: "Available commands:"},
+		&cobra.Group{ID: groupActions, Title: "Available actions:"},
+		&cobra.Group{ID: groupEffects, Title: "Fun effects:"},
+	)
 
-	// Channel assignment
-	cmd.AddCommand(newScreensSetChannelCmd())
-	cmd.AddCommand(newScreensTempChannelCmd())
+	addTo := func(groupID string, cmds ...*cobra.Command) {
+		for _, c := range cmds {
+			c.GroupID = groupID
+			cmd.AddCommand(c)
+		}
+	}
 
-	// Direct commands
-	cmd.AddCommand(newScreenActionCmd("reload", "Reload the screen", "reload", ""))
-	cmd.AddCommand(newScreenActionCmd("reboot", "Reboot the screen", "reboot", ""))
-	cmd.AddCommand(newScreenActionCmd("clear-cache", "Clear the screen cache", "clear_cache", ""))
-	cmd.AddCommand(newScreenActionCmd("upgrade-firmware", "Upgrade screen firmware", "upgrade_firmware", ""))
-	cmd.AddCommand(newScreenActionCmd("identify", "Identify the screen (shows overlay)", "identify", ""))
-	cmd.AddCommand(newScreenActionCmd("toggle-night-mode", "Toggle night mode on the screen", "toggle_night_mode", ""))
+	// Info & management
+	addTo(groupCommands,
+		newScreensListCmd(),
+		newScreensShowCmd(),
+		newScreensStatsCmd(),
+		newScreensWatchCmd(),
+		newScreensWaitOnlineCmd(),
+		newScreensSetChannelCmd(),
+		newScreensTempChannelCmd(),
+	)
 
-	// Remote control signals
-	cmd.AddCommand(newScreenActionCmd("next", "Skip to next content", "remote_control", "next"))
-	cmd.AddCommand(newScreenActionCmd("previous", "Go to previous content", "remote_control", "previous"))
-	cmd.AddCommand(newScreenActionCmd("play", "Play content", "remote_control", "play"))
-	cmd.AddCommand(newScreenActionCmd("pause", "Pause content", "remote_control", "pause"))
-	cmd.AddCommand(newScreenActionCmd("toggle-play", "Toggle play/pause", "remote_control", "toggle_play"))
-	cmd.AddCommand(newScreenActionCmd("forwards", "Skip forwards", "remote_control", "forwards"))
-	cmd.AddCommand(newScreenActionCmd("backwards", "Skip backwards", "remote_control", "backwards"))
+	// Device + playback actions
+	addTo(groupActions,
+		newScreenActionCmd("reload", "Reload the screen", "reload", ""),
+		newScreenActionCmd("reboot", "Reboot the screen", "reboot", ""),
+		newScreenActionCmd("clear-cache", "Clear the screen cache", "clear_cache", ""),
+		newScreenActionCmd("upgrade-firmware", "Upgrade screen firmware", "upgrade_firmware", ""),
+		newScreenActionCmd("identify", "Identify the screen (shows overlay)", "identify", ""),
+		newScreenActionCmd("toggle-night-mode", "Toggle night mode on the screen", "toggle_night_mode", ""),
+		newScreenActionCmd("next", "Skip to next content", "remote_control", "next"),
+		newScreenActionCmd("previous", "Go to previous content", "remote_control", "previous"),
+		newScreenActionCmd("play", "Play content", "remote_control", "play"),
+		newScreenActionCmd("pause", "Pause content", "remote_control", "pause"),
+		newScreenActionCmd("toggle-play", "Toggle play/pause", "remote_control", "toggle_play"),
+		newScreenActionCmd("forwards", "Skip forwards", "remote_control", "forwards"),
+		newScreenActionCmd("backwards", "Skip backwards", "remote_control", "backwards"),
+	)
 
-	// Effects
-	cmd.AddCommand(newScreenActionCmd("confetti-fire", "Trigger confetti fire effect", "trigger_effect", "confetti_fire"))
-	cmd.AddCommand(newScreenActionCmd("confetti-fireworks", "Trigger confetti fireworks effect", "trigger_effect", "confetti_fireworks"))
-	cmd.AddCommand(newScreenActionCmd("school-parade", "Trigger school parade effect", "trigger_effect", "confetti_school_parade"))
-	cmd.AddCommand(newScreenActionCmd("snow", "Trigger snow effect", "trigger_effect", "snow"))
+	// Fun effects
+	addTo(groupEffects,
+		newScreenActionCmd("confetti-fire", "Trigger confetti fire effect", "trigger_effect", "confetti_fire"),
+		newScreenActionCmd("confetti-fireworks", "Trigger confetti fireworks effect", "trigger_effect", "confetti_fireworks"),
+		newScreenActionCmd("school-parade", "Trigger school parade effect", "trigger_effect", "confetti_school_parade"),
+		newScreenActionCmd("snow", "Trigger snow effect", "trigger_effect", "snow"),
+	)
 
 	return cmd
 }
