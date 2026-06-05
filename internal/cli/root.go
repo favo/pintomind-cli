@@ -38,12 +38,25 @@ func NewRootCmd() *cobra.Command {
 				return err
 			}
 
-			domainName, domain, err := cfg.ActiveDomain(connectionOverride)
-			if err != nil {
-				return err
+			// Environment variables override the stored config when no explicit
+			// --connection is given. Handy for CI and scripted/headless use.
+			var baseURL, apiKey, domainName string
+			if connectionOverride == "" && os.Getenv("PINTOMIND_API_KEY") != "" {
+				apiKey = os.Getenv("PINTOMIND_API_KEY")
+				baseURL = os.Getenv("PINTOMIND_API_URL")
+				if baseURL == "" {
+					baseURL = "https://app.infoskjermen.no"
+				}
+				domainName = "env"
+			} else {
+				name, domain, err := cfg.ActiveDomain(connectionOverride)
+				if err != nil {
+					return err
+				}
+				baseURL, apiKey, domainName = domain.BaseURL, domain.APIKey, name
 			}
 
-			client := api.New(domain.BaseURL, domain.APIKey)
+			client := api.New(baseURL, apiKey)
 			client.Verbose = verbose
 			app := &appctx.App{
 				Config:           cfg,

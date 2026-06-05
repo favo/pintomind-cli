@@ -25,6 +25,9 @@ func NewMeCmd() *cobra.Command {
 				return nil
 			}
 			fmt.Printf("Connection: %s\n", a.ActiveConnection)
+			if env, ok := result["env"].(string); ok && env != "" {
+				fmt.Printf("Env:     %s\n", env)
+			}
 			if user, ok := result["user"].(map[string]any); ok {
 				if name, ok := user["name"].(string); ok && name != "" {
 					fmt.Printf("User:    %s\n", name)

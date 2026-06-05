@@ -109,6 +109,21 @@ Use `--connection` to target a specific connection without changing the default:
 pintomind --connection alternative-account screens list
 ```
 
+### Credentials via environment variables
+
+For CI and headless/scripted use you can skip the stored config entirely. When
+`PINTOMIND_API_KEY` is set (and no `--connection` is passed), the CLI uses it
+instead of the config file:
+
+```bash
+export PINTOMIND_API_KEY=sk-your-key
+pintomind me        # Connection: env
+```
+
+`PINTOMIND_API_URL` is optional and defaults to `https://app.infoskjermen.no`;
+set it to target another endpoint. An explicit `--connection` flag always takes
+precedence over the env vars.
+
 ---
 
 ## Global flags
