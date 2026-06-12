@@ -340,6 +340,21 @@ Flag syntax for `set`:
 
 For a quick "expire at X" use `--until` on `posts create *` / `publish` instead. See `pintomind posts schema time-schedule` for the JSON schema.
 
+**Push notifications — alert the Go mobile app:**
+
+Schedule push notifications for a post. Each is delivered to the notification-enabled devices of every channel the post is published to. Title (max 50) and body (max 150) are optional — leave them blank to auto-fill from the post at send time. A post may have at most 12 pending notifications.
+
+```bash
+pintomind posts notifications list <post-id>                    # All notifications (most recent first)
+pintomind posts notifications list <post-id> --status queued    # Only pending (or --status sent)
+pintomind posts notifications create <post-id> --send-at 2026-07-01T15:30:00Z
+pintomind posts notifications create <post-id> --send-at 2026-07-01T15:30:00Z \
+  --title "Breaking news" --body "New content has just been published"
+pintomind posts notifications cancel <post-id> <notification-id> # Cancel a pending notification
+```
+
+`--send-at` is a required future ISO 8601 datetime. The list shows delivery counts (`SENT`) and opens (`READ`) for already-sent notifications.
+
 ### Resources
 
 ```bash
