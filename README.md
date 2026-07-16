@@ -273,6 +273,7 @@ pintomind posts create image --image ./photo.jpg --template fullpane  # center |
 # Plain text post
 pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
 pintomind posts create plain --name "Msg" --body "<p>Content</p>" --body-alignment center --body-fontsize 150
+pintomind posts create plain --name "Duo" --heading "<p>Hi</p>" --body "<p>Text</p>" --media 42 --media 43 --variation R13-HTII
 
 # Feed post (creates an RSS/Atom resource automatically)
 pintomind posts create feed --name "News" --url https://rss.example.com --channel-id 7
@@ -298,10 +299,13 @@ pintomind posts create poster --name "Brand poster" --source-id <template-id> --
 ```bash
 pintomind posts create --type image --data '{"name":"Spring","duration_per_item":7,"images":[{"media_id":42}],"template":"fullpane"}'
 pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","body":"<p>World</p>","media_box_ids":[201,202],"background_id":301}'
+pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","media_box_ids":[201,202],"variation":"R121-HIIT"}'
 pintomind posts create --type poster --source-id <template-id> --data '{"name":"My poster"}'
 ```
 
 Image templates: `center` (centered, full image), `maxpane` (fill, full image), `fullpane` (fill, cropped), `image_grid` (mosaic). The legacy `aspect_ratio` / `grid_layout` / `variation` fields are no longer accepted.
+
+Plain post layout: by default the server picks a grid layout from the body content, media count, and media shape. Pass `--variation <name>` (or `"variation"` in `--data`) to force a named layout, or `auto` to re-run the automatic selection — useful in `posts update` since omitting `variation` there preserves the current layout. `pintomind schemas show post_plain` lists every layout name, and its `x-variation-details` object describes each one (slot counts, composition, when auto picks it).
 
 Any post type accepts `background_id` (a MediaBox id) as a post background. Pass `null` in `posts update --data` to clear.
 
@@ -502,7 +506,7 @@ pintomind resources update <resource-id> --data '{"poster_data": "<json-string>"
 
 ### Media Boxes
 
-Media boxes are reusable visual slots for plain posts. Create boxes first, then pass their IDs to a plain post in `media_box_ids` slot order. The API picks the plain-post grid variation from the number of boxes.
+Media boxes are reusable visual slots for plain posts. Create boxes first, then pass their IDs to a plain post in `media_box_ids` slot order. The API picks the plain-post grid variation from the body content, the number of boxes, and their shape — or use `variation` to pick a named layout yourself.
 
 ```bash
 pintomind media-boxes list

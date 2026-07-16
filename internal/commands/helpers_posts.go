@@ -369,7 +369,7 @@ func createMediaBoxAndPrint(a *appctx.App, boxType string, data map[string]any) 
 
 // newPostsCreatePlainCmd creates a plain text post.
 func newPostsCreatePlainCmd() *cobra.Command {
-	var name, heading, body string
+	var name, heading, body, variation string
 	var headingAlignment, bodyAlignment string
 	var headingFontsize, bodyFontsize int
 	var images, emojis, icons, gifs, unsplashIDs []string
@@ -384,13 +384,14 @@ func newPostsCreatePlainCmd() *cobra.Command {
 		Short: "Create a plain text post",
 		Example: `  pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
   pintomind posts create plain --name "Msg" --heading "<p>Hi</p>" --heading-alignment center --heading-fontsize 150 --body "<p>Content</p>" --body-alignment left --body-fontsize 80
-  pintomind posts create plain --name "Photo" --heading "<p>Look</p>" --image ./photo.jpg --unsplash abc123 --channel-id 7`,
+  pintomind posts create plain --name "Photo" --heading "<p>Look</p>" --image ./photo.jpg --unsplash abc123 --channel-id 7
+  pintomind posts create plain --name "Duo" --heading "<p>Hi</p>" --body "<p>Text</p>" --media 42 --media 43 --variation R13-HTII`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 
 			if interactive {
 				var mbi plainMediaBoxInputs
-				if err := interactivePostPlain(&name, &heading, &body, &headingAlignment, &bodyAlignment, &headingFontsize, &bodyFontsize, &mbi, &pf); err != nil {
+				if err := interactivePostPlain(&name, &heading, &body, &variation, &headingAlignment, &bodyAlignment, &headingFontsize, &bodyFontsize, &mbi, &pf); err != nil {
 					if isAborted(err) {
 						return nil
 					}
@@ -402,6 +403,9 @@ func newPostsCreatePlainCmd() *cobra.Command {
 				}
 				if body != "" {
 					_ = cmd.Flags().Set("body", body)
+				}
+				if variation != "" {
+					_ = cmd.Flags().Set("variation", variation)
 				}
 				if headingAlignment != "" {
 					_ = cmd.Flags().Set("heading-alignment", headingAlignment)
@@ -434,8 +438,8 @@ func newPostsCreatePlainCmd() *cobra.Command {
 				{"heading-fontsize", headingFontsize},
 				{"body-fontsize", bodyFontsize},
 			} {
-				if cmd.Flags().Changed(f.name) && (f.val < 50 || f.val > 400) {
-					return fmt.Errorf("--%s must be between 50 and 400", f.name)
+				if cmd.Flags().Changed(f.name) && (f.val < 20 || f.val > 400) {
+					return fmt.Errorf("--%s must be between 20 and 400", f.name)
 				}
 			}
 
@@ -536,6 +540,9 @@ func newPostsCreatePlainCmd() *cobra.Command {
 			if cmd.Flags().Changed("body") {
 				post["body"] = body
 			}
+			if cmd.Flags().Changed("variation") {
+				post["variation"] = variation
+			}
 			if len(mediaBoxIDs) > 0 {
 				post["media_box_ids"] = mediaBoxIDs
 			}
@@ -593,10 +600,11 @@ func newPostsCreatePlainCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
 	cmd.Flags().StringVar(&heading, "heading", "", "Heading HTML (e.g. '<p>Hello</p>')")
 	cmd.Flags().StringVar(&body, "body", "", "Body HTML")
+	cmd.Flags().StringVar(&variation, "variation", "", "Named grid layout (e.g. R12-HIT), or 'auto' to let the server pick; omit for auto (see 'pintomind schemas show post_plain')")
 	cmd.Flags().StringVar(&headingAlignment, "heading-alignment", "", "Heading text alignment: left, center, or right")
-	cmd.Flags().IntVar(&headingFontsize, "heading-fontsize", 100, "Heading font size as percentage (50–400, default 100)")
+	cmd.Flags().IntVar(&headingFontsize, "heading-fontsize", 100, "Heading font size as percentage (20–400, default 100)")
 	cmd.Flags().StringVar(&bodyAlignment, "body-alignment", "", "Body text alignment: left, center, or right")
-	cmd.Flags().IntVar(&bodyFontsize, "body-fontsize", 100, "Body font size as percentage (50–400, default 100)")
+	cmd.Flags().IntVar(&bodyFontsize, "body-fontsize", 100, "Body font size as percentage (20–400, default 100)")
 	cmd.Flags().StringArrayVar(&images, "image", nil, "Image file or URL to upload as media box (repeatable, max 4 total)")
 	cmd.Flags().IntSliceVar(&mediaIDs, "media", nil, "Existing media ID to use as media box (repeatable)")
 	cmd.Flags().StringArrayVar(&gifs, "gif", nil, "GIF ID for a gif media box (repeatable)")

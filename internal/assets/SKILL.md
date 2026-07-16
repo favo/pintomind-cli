@@ -171,7 +171,7 @@ Inspect valid fields for resource and post types:
 pintomind schemas list
 pintomind schemas show <id>           # e.g. pintomind schemas show text
 pintomind schemas show post_<alias>   # e.g. pintomind schemas show post_image
-pintomind schemas show grid_templates # named grid layouts for plain post variations
+pintomind schemas show post_plain     # includes x-variation-details: every grid layout for plain posts
 ```
 
 Resource schema keys: `calendar`, `calendar_events`, `entur`, `external_image`, `external_webpage`, `feed`, `feed_items`, `html`, `location`, `qr_code`, `text`, `youtube`, `poster_page`.
@@ -246,6 +246,7 @@ pintomind posts create image --name "X" --image ./photo.jpg --media-collection 1
 # Plain text post
 pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
 pintomind posts create plain --name "Msg" --heading "<p>Hi</p>" --heading-alignment center --heading-fontsize 150 --body "<p>Body</p>" --body-alignment left --body-fontsize 80
+pintomind posts create plain --name "Duo" --heading "<p>Hi</p>" --body "<p>Text</p>" --media 42 --media 43 --variation R13-HTII  # named grid layout (or 'auto'); omit for auto. Layouts: schemas show post_plain
 
 # Feed post — creates a feed resource then the post
 pintomind posts create feed --name "News" --url https://example.com/rss.xml --channel-id 7
@@ -487,7 +488,9 @@ pintomind resources update <resource-id> --data '{"color_palette_id": 5}'
 
 Media boxes are visual containers used by both plain posts and poster posts.
 
-**Plain posts** use `media_box_ids` as an **array** of IDs in slot order. The server writes each box UUID into the selected grid and sets `post_id` on the attached boxes. Max 4 boxes; grid variation selected by count: 0 → `R12-HT`, 1 → `R12-HIT`, 2 → `R121-HIIT`, 3 → `R131-HIIIT`, 4 → `R14-HIIIIT`.
+**Plain posts** use `media_box_ids` as an **array** of IDs in slot order. The server writes each box UUID into the selected grid and sets `post_id` on the attached boxes. Max 4 boxes. The grid variation is selected automatically from body presence and length, media count, and media shape (wide/portrait). Pass `variation` (`--variation` on `posts create plain`) with a named layout to override, or `auto` to re-run the selection; omitting `variation` on update preserves the current layout.
+
+To pick a layout yourself instead of relying on auto, run `pintomind schemas show post_plain`: the `variation` property's `x-variation-details` object describes every layout — media slot count, whether it has a body slot, the composition, what it's best for, and when auto selects it. Choose the entry matching your media count and body needs.
 
 **Poster posts** use `media_box_ids` as a **hash** of `{ "node-position": box_id }` on the backing `PosterPageResource`. The key is the `id` of the target node inside the poster template. Each submission is a full replacement; omitted positions are removed. Pass `{}` to remove all.
 
@@ -519,8 +522,12 @@ pintomind posts create --type plain --data '{
   "media_box_ids":[201,202]
 }'
 
-# Replace attached boxes on an existing plain post
+# Replace attached boxes on an existing plain post (layout preserved when variation is omitted)
 pintomind posts update <post-id> --data '{"media_box_ids":[203]}'
+
+# Force a named layout, or re-run automatic layout selection
+pintomind posts update <post-id> --data '{"variation":"R121-HIIT"}'
+pintomind posts update <post-id> --data '{"variation":"auto"}'
 
 # Attach boxes to a poster post (hash of node-position → id, via poster_page resource)
 pintomind resources update <resource-id> --data '{"media_box_ids": {"hero-image": 201, "avatar": 202}}'
