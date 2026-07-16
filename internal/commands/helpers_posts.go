@@ -17,12 +17,14 @@ type publishOpts struct {
 	channelIDs []int
 	area       string
 	fullScreen bool
+	position   int // 0-based play-order position within the area; -1 = channel default
 }
 
 func addPublishFlags(cmd *cobra.Command, p *publishOpts) {
 	cmd.Flags().IntSliceVar(&p.channelIDs, "channel-id", nil, "Channel to publish to (repeatable)")
 	cmd.Flags().StringVar(&p.area, "area", "", "Channel area for publication")
 	cmd.Flags().BoolVar(&p.fullScreen, "full-screen", false, "Publish as fullscreen")
+	cmd.Flags().IntVar(&p.position, "position", -1, "0-based play-order position within the channel area (0 = first; omit for channel default)")
 }
 
 // postPriorities are the playback priority values accepted by the API for all post types.
@@ -201,7 +203,7 @@ func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, durat
 		fmt.Printf("Created image post %d\n", postID)
 	}
 
-	if err := publishToChannels(a, postID, p.channelIDs, p.area, p.fullScreen); err != nil {
+	if err := publishToChannels(a, postID, p); err != nil {
 		return err
 	}
 
@@ -249,7 +251,7 @@ func createResourceBackedPost(a *appctx.App, postType, resourceType string, reso
 		fmt.Printf("Created %s post %d\n", postType, postID)
 	}
 
-	if err := publishToChannels(a, postID, p.channelIDs, p.area, p.fullScreen); err != nil {
+	if err := publishToChannels(a, postID, p); err != nil {
 		return err
 	}
 
@@ -263,17 +265,20 @@ func createResourceBackedPost(a *appctx.App, postType, resourceType string, reso
 	return nil
 }
 
-// publishToChannels publishes postID to all channels in one request, applying area and fullScreen to all.
-func publishToChannels(a *appctx.App, postID int, channelIDs []int, area string, fullScreen bool) error {
-	if len(channelIDs) == 0 {
+// publishToChannels publishes postID to all channels in one request, applying the publish options to all.
+func publishToChannels(a *appctx.App, postID int, p publishOpts) error {
+	if len(p.channelIDs) == 0 {
 		return nil
 	}
-	pub := map[string]any{"channel_ids": channelIDs}
-	if area != "" {
-		pub["area"] = area
+	pub := map[string]any{"channel_ids": p.channelIDs}
+	if p.area != "" {
+		pub["area"] = p.area
 	}
-	if fullScreen {
+	if p.fullScreen {
 		pub["full_screen"] = true
+	}
+	if p.position >= 0 {
+		pub["position"] = p.position
 	}
 	var resp struct {
 		Success      bool                `json:"success"`
@@ -635,7 +640,7 @@ func newPostsCreatePlainCmd() *cobra.Command {
 				fmt.Printf("Created plain post %d\n", postID)
 			}
 
-			if err := publishToChannels(a, postID, pf.channelIDs, pf.area, pf.fullScreen); err != nil {
+			if err := publishToChannels(a, postID, pf); err != nil {
 				return err
 			}
 
@@ -934,7 +939,7 @@ func newPostsCreatePosterCmd() *cobra.Command {
 				}
 			}
 
-			if err := publishToChannels(a, postID, pf.channelIDs, pf.area, pf.fullScreen); err != nil {
+			if err := publishToChannels(a, postID, pf); err != nil {
 				return err
 			}
 
@@ -1074,7 +1079,7 @@ func newPostsCreateCounterCmd() *cobra.Command {
 				fmt.Printf("Created counter post %d\n", postID)
 			}
 
-			if err := publishToChannels(a, postID, pf.channelIDs, pf.area, pf.fullScreen); err != nil {
+			if err := publishToChannels(a, postID, pf); err != nil {
 				return err
 			}
 

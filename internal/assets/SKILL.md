@@ -98,6 +98,9 @@ pintomind channels list --sort-by name
 pintomind channels list --page 2 --per-page 50
 pintomind channels show <id>
 pintomind channels posts <id>           # account token required
+pintomind channels posts <id> --visible                 # only currently visible publications (--hidden for the inverse)
+pintomind channels posts <id> --sort-by position        # play order (also: area, created_at, updated_at; append :desc; comma-separate)
+pintomind channels posts <id> --fields id,title,position,will_be_visible_at,will_be_hidden_at --json
 pintomind channels stats                # requires channels:read:stats scope
 pintomind channels stats <id>
 pintomind channels set-theme <channel-id> <theme-id>
@@ -270,6 +273,7 @@ pintomind posts create poster --name "Brand poster" --source-id 42 --color-palet
 All `posts create <type>` helpers accept:
 - `--channel-id N` (repeatable) — publish to one or more channels immediately
 - `--area F11` — channel area for all publications
+- `--position N` — 0-based play-order position within the channel area (0 = first; omit for channel default)
 - `--full-screen` — publish fullscreen to all channels
 - `--priority <value>` — playback priority: `once_per_round` (default), `twice_per_round`, `between_each_post`, `only_post_in_area`, `only_post_in_channel`, `every_other_round`, `once_per_hour`. Any post schema (`pintomind schemas show post_<alias>`) describes each value's behavior.
 - `--until <YYYY-MM-DD[THH:MM]>` — auto-expire the post at this date/time (attaches a one-period schedule that unpublishes on expiry). Time defaults to `23:59` when omitted.
@@ -401,6 +405,7 @@ pintomind posts publish <post-id> --channel-id 7                    # publish to
 pintomind posts publish <post-id> --channel-id 7 --channel-id 12    # multiple channels in one call
 pintomind posts publish <post-id> --channel-id 7 --area F11         # specific area
 pintomind posts publish <post-id> --channel-id 7 --full-screen      # fullscreen
+pintomind posts publish <post-id> --channel-id 7 --position 0       # 0-based play-order position in the area (omit for channel default)
 pintomind posts unpublish <post-id>                                 # unpublish from ALL channels
 pintomind posts unpublish <post-id> --channel-id 7                  # unpublish from a specific channel
 pintomind posts unpublish <post-id> --channel-id 7 --channel-id 12 --force

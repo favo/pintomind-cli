@@ -100,21 +100,98 @@ func newChannelsShowCmd() *cobra.Command {
 	}
 }
 
+type ChannelPost struct {
+	ID       int    `json:"id"`
+	Type     string `json:"type"`
+	Title    string `json:"title"`
+	Area     string `json:"area"`
+	Position *int   `json:"position"`
+	Priority string `json:"priority"`
+	Visible  *bool  `json:"visible"`
+}
+
+type ChannelPostsResponse struct {
+	Total int           `json:"total"`
+	Items []ChannelPost `json:"items"`
+}
+
 func newChannelsPostsCmd() *cobra.Command {
-	return &cobra.Command{
+	var sortBy, fields string
+	var visible, hidden bool
+
+	cmd := &cobra.Command{
 		Use:   "posts <channel-id>",
 		Short: "List posts in a channel (account token required)",
-		Args:  cobra.ExactArgs(1),
+		Example: `  pintomind channels posts 7
+  pintomind channels posts 7 --visible                 # currently visible only
+  pintomind channels posts 7 --hidden                  # currently hidden only
+  pintomind channels posts 7 --sort-by position        # play order (also: area, created_at, updated_at)
+  pintomind channels posts 7 --sort-by area,position:desc`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			var resp map[string]any
-			if err := a.Client.Get("/channels/"+args[0]+"/posts", nil, &resp); err != nil {
+			if visible && hidden {
+				return fmt.Errorf("--visible and --hidden are mutually exclusive")
+			}
+			q := url.Values{}
+			if visible {
+				q.Set("visible", "true")
+			}
+			if hidden {
+				q.Set("visible", "false")
+			}
+			if sortBy != "" {
+				q.Set("sort_by", sortBy)
+			}
+			if fields != "" {
+				q.Set("fields", fields)
+			}
+			applyPagination(cmd, q)
+
+			if a.JSONOutput {
+				var resp map[string]any
+				if err := a.Client.Get("/channels/"+args[0]+"/posts", q, &resp); err != nil {
+					return err
+				}
+				printJSON(resp)
+				return nil
+			}
+
+			var resp ChannelPostsResponse
+			if err := a.Client.Get("/channels/"+args[0]+"/posts", q, &resp); err != nil {
 				return err
 			}
-			printJSON(resp)
+			fmt.Printf("Total: %d\n\n", resp.Total)
+			rows := make([][]string, len(resp.Items))
+			for i, p := range resp.Items {
+				pos := ""
+				if p.Position != nil {
+					pos = strconv.Itoa(*p.Position)
+				}
+				vis := ""
+				if p.Visible != nil {
+					vis = strconv.FormatBool(*p.Visible)
+				}
+				rows[i] = []string{
+					strconv.Itoa(p.ID),
+					p.Type,
+					p.Title,
+					p.Area,
+					pos,
+					p.Priority,
+					vis,
+				}
+			}
+			printTable(cmd, []string{"ID", "TYPE", "TITLE", "AREA", "POSITION", "PRIORITY", "VISIBLE"}, rows)
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&visible, "visible", false, "Only publications that are currently visible")
+	cmd.Flags().BoolVar(&hidden, "hidden", false, "Only publications that are currently hidden")
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: area, position, created_at, updated_at (append :desc to reverse; comma-separate for multiple)")
+	cmd.Flags().StringVar(&fields, "fields", "", "Comma-separated fields to include (e.g. id,title,position,will_be_visible_at)")
+	addPaginationFlags(cmd)
+	return cmd
 }
 
 func newChannelsStatsCmd() *cobra.Command {

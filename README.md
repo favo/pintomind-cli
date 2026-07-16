@@ -238,6 +238,11 @@ pintomind channels list --sort-by name
 pintomind channels list --page 2 --per-page 50
 pintomind channels show <id>
 pintomind channels posts <id>            # Requires account token
+pintomind channels posts <id> --visible                # only currently visible publications
+pintomind channels posts <id> --hidden                 # only currently hidden publications
+pintomind channels posts <id> --sort-by position       # play order (also: area, created_at, updated_at; append :desc)
+pintomind channels posts <id> --sort-by area,position --page 2 --per-page 50
+pintomind channels posts <id> --fields id,title,position,will_be_visible_at --json
 pintomind channels stats                 # Requires channels:read:stats scope
 pintomind channels stats <id>
 pintomind channels set-theme <channel-id> <theme-id>
@@ -260,7 +265,7 @@ pintomind posts delete <id> --force
 
 **Create posts with typed subcommands:**
 
-Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, `--background-media-box <id>` (MediaBox id used as the post background — create one first with `pintomind media-boxes create ...`), `--priority <value>` (playback priority, see below), plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
+Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, `--position <n>` (0-based play-order position within the channel area; omit for the channel default), `--background-media-box <id>` (MediaBox id used as the post background — create one first with `pintomind media-boxes create ...`), `--priority <value>` (playback priority, see below), plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
 
 ```bash
 # Image post — upload files and/or reference existing media IDs
@@ -334,6 +339,7 @@ pintomind posts publish <post-id> --channel-id 7                # Publish to one
 pintomind posts publish <post-id> --channel-id 7 --channel-id 12  # Publish to multiple channels in one call
 pintomind posts publish <post-id> --channel-id 7 --area F11
 pintomind posts publish <post-id> --channel-id 7 --full-screen
+pintomind posts publish <post-id> --channel-id 7 --position 0    # first in the area's play order
 pintomind posts unpublish <post-id>                             # Unpublish from ALL channels
 pintomind posts unpublish <post-id> --channel-id 7              # Unpublish from specific channel(s)
 pintomind posts unpublish <post-id> --channel-id 7 --channel-id 12 --force
