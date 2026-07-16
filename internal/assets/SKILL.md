@@ -271,6 +271,7 @@ All `posts create <type>` helpers accept:
 - `--channel-id N` (repeatable) — publish to one or more channels immediately
 - `--area F11` — channel area for all publications
 - `--full-screen` — publish fullscreen to all channels
+- `--priority <value>` — playback priority: `once_per_round` (default), `twice_per_round`, `between_each_post`, `only_post_in_area`, `only_post_in_channel`, `every_other_round`, `once_per_hour`. Any post schema (`pintomind schemas show post_<alias>`) describes each value's behavior.
 - `--until <YYYY-MM-DD[THH:MM]>` — auto-expire the post at this date/time (attaches a one-period schedule that unpublishes on expiry). Time defaults to `23:59` when omitted.
 
 `--until` is evaluated in each channel's local time zone. For richer schedules (recurring weekly windows, multiple periods, or other expiry actions) use `pintomind posts schedule set` after creating the post.
@@ -328,7 +329,7 @@ pintomind schemas show post_plain
 pintomind schemas show post_calendar
 ```
 
-Common shared fields: `name`, `title`, `duration`, `show_title`, `area`, `background_id` (a MediaBox id used as post background — create one with `pintomind media-boxes create ...`; pass `null` on update to clear).
+Common shared fields: `name`, `title`, `duration`, `show_title`, `area`, `priority` (playback frequency/takeover policy — enum and per-value behavior in every post schema), `background_id` (a MediaBox id used as post background — create one with `pintomind media-boxes create ...`; pass `null` on update to clear).
 
 Typed `posts create` subcommands also accept `--background-media-box <id>` and the `image` subcommand accepts `--template center|maxpane|fullpane|image_grid`.
 

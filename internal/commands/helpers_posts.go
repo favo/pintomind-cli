@@ -25,6 +25,41 @@ func addPublishFlags(cmd *cobra.Command, p *publishOpts) {
 	cmd.Flags().BoolVar(&p.fullScreen, "full-screen", false, "Publish as fullscreen")
 }
 
+// postPriorities are the playback priority values accepted by the API for all post types.
+var postPriorities = []string{
+	"once_per_round", "twice_per_round", "between_each_post",
+	"only_post_in_area", "only_post_in_channel", "every_other_round", "once_per_hour",
+}
+
+// addPriorityFlag adds --priority, a shared playback-priority setting valid for all post types.
+func addPriorityFlag(cmd *cobra.Command, priority *string) {
+	cmd.Flags().StringVar(priority, "priority", "", "Playback priority: "+strings.Join(postPriorities, ", ")+" (default once_per_round)")
+}
+
+// validatePriority checks that priority is empty or one of postPriorities.
+func validatePriority(priority string) error {
+	if priority == "" {
+		return nil
+	}
+	for _, p := range postPriorities {
+		if priority == p {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid --priority %q (want one of %s)", priority, strings.Join(postPriorities, ", "))
+}
+
+// applyPriority validates priority when non-empty and adds it to the post map.
+func applyPriority(post map[string]any, priority string) error {
+	if err := validatePriority(priority); err != nil {
+		return err
+	}
+	if priority != "" {
+		post["priority"] = priority
+	}
+	return nil
+}
+
 // addBackgroundFlag adds --background-media-box, a shared MediaBox id used as the post background.
 func addBackgroundFlag(cmd *cobra.Command, bgID *int) {
 	cmd.Flags().IntVar(bgID, "background-media-box", 0, "MediaBox id used as post background (create one with 'pintomind media-boxes create ...')")
@@ -133,7 +168,7 @@ func createResourceAndPrint(a *appctx.App, resourceType string, data map[string]
 }
 
 // createAndPublishImagePost creates an image post from mediaIDs, then publishes to channels.
-func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, duration int, template string, bgID int, p publishOpts, u untilOpts) error {
+func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, duration int, template, priority string, bgID int, p publishOpts, u untilOpts) error {
 	images := make([]map[string]any, len(mediaIDs))
 	for i, id := range mediaIDs {
 		images[i] = map[string]any{"media_id": id}
@@ -147,6 +182,9 @@ func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, durat
 	}
 	if template != "" {
 		post["template"] = template
+	}
+	if err := applyPriority(post, priority); err != nil {
+		return err
 	}
 	applyBackground(post, bgID)
 
@@ -178,7 +216,12 @@ func createAndPublishImagePost(a *appctx.App, name string, mediaIDs []int, durat
 }
 
 // createResourceBackedPost creates a resource, then a post wired to it, then publishes.
-func createResourceBackedPost(a *appctx.App, postType, resourceType string, resourceData map[string]any, name string, bgID int, p publishOpts, u untilOpts) error {
+func createResourceBackedPost(a *appctx.App, postType, resourceType string, resourceData map[string]any, name, priority string, bgID int, p publishOpts, u untilOpts) error {
+	post := map[string]any{}
+	if err := applyPriority(post, priority); err != nil {
+		return err
+	}
+
 	resourceID, err := createResource(a, resourceType, resourceData)
 	if err != nil {
 		return fmt.Errorf("creating %s resource: %w", resourceType, err)
@@ -187,7 +230,7 @@ func createResourceBackedPost(a *appctx.App, postType, resourceType string, reso
 		fmt.Printf("Created %s resource %d\n", resourceType, resourceID)
 	}
 
-	post := map[string]any{"resource_ids": []int{resourceID}}
+	post["resource_ids"] = []int{resourceID}
 	if name != "" {
 		post["name"] = name
 	}
@@ -272,7 +315,7 @@ func intFromNestedResp(resp map[string]any, outer, inner string) (int, error) {
 
 // newPostsCreateImageCmd creates an image post, optionally uploading files first.
 func newPostsCreateImageCmd() *cobra.Command {
-	var name, template string
+	var name, template, priority string
 	var images []string
 	var mediaIDs []int
 	var mediaCollection, bgID int
@@ -302,6 +345,9 @@ func newPostsCreateImageCmd() *cobra.Command {
 			if len(images) == 0 && len(mediaIDs) == 0 {
 				return fmt.Errorf("provide at least one --image or --media flag (or use --interactive / -i)")
 			}
+			if err := validatePriority(priority); err != nil {
+				return err
+			}
 
 			allMediaIDs := make([]int, 0, len(images)+len(mediaIDs))
 
@@ -325,7 +371,7 @@ func newPostsCreateImageCmd() *cobra.Command {
 			}
 			allMediaIDs = append(allMediaIDs, mediaIDs...)
 
-			return createAndPublishImagePost(a, name, allMediaIDs, duration, template, bgID, pf, uo)
+			return createAndPublishImagePost(a, name, allMediaIDs, duration, template, priority, bgID, pf, uo)
 		},
 	}
 
@@ -336,6 +382,7 @@ func newPostsCreateImageCmd() *cobra.Command {
 	cmd.Flags().IntVar(&duration, "duration", 7, "Seconds per slide")
 	cmd.Flags().StringVar(&template, "template", "", "Image post template: center, maxpane, fullpane, image_grid")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
+	addPriorityFlag(cmd, &priority)
 	addPublishFlags(cmd, &pf)
 	addBackgroundFlag(cmd, &bgID)
 	addUntilFlag(cmd, &uo)
@@ -369,7 +416,7 @@ func createMediaBoxAndPrint(a *appctx.App, boxType string, data map[string]any) 
 
 // newPostsCreatePlainCmd creates a plain text post.
 func newPostsCreatePlainCmd() *cobra.Command {
-	var name, heading, body, variation string
+	var name, heading, body, variation, priority string
 	var headingAlignment, bodyAlignment string
 	var headingFontsize, bodyFontsize int
 	var images, emojis, icons, gifs, unsplashIDs []string
@@ -446,6 +493,9 @@ func newPostsCreatePlainCmd() *cobra.Command {
 			totalBoxes := len(images) + len(mediaIDs) + len(gifs) + len(unsplashIDs) + len(emojis) + len(icons)
 			if totalBoxes > 4 {
 				return fmt.Errorf("maximum 4 media boxes allowed, got %d", totalBoxes)
+			}
+			if err := validatePriority(priority); err != nil {
+				return err
 			}
 
 			// Collect media box IDs, creating each in turn.
@@ -533,6 +583,9 @@ func newPostsCreatePlainCmd() *cobra.Command {
 			if name != "" {
 				post["name"] = name
 			}
+			if err := applyPriority(post, priority); err != nil {
+				return err
+			}
 			applyBackground(post, bgID)
 			if cmd.Flags().Changed("heading") {
 				post["heading"] = heading
@@ -612,6 +665,7 @@ func newPostsCreatePlainCmd() *cobra.Command {
 	cmd.Flags().StringArrayVar(&emojis, "emoji", nil, "Emoji character for an emoji media box (repeatable)")
 	cmd.Flags().StringArrayVar(&icons, "icon", nil, "Icon name (or name:type) for an icon media box (repeatable)")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
+	addPriorityFlag(cmd, &priority)
 	addPublishFlags(cmd, &pf)
 	addBackgroundFlag(cmd, &bgID)
 	addUntilFlag(cmd, &uo)
@@ -624,7 +678,7 @@ func newPostsCreateURLResourcePostCmd(
 	use, short, postType, resourceType, urlField string,
 	interactiveFn func(name, urlStr *string, p *publishOpts) error,
 ) *cobra.Command {
-	var name, urlStr string
+	var name, urlStr, priority string
 	var bgID int
 	var pf publishOpts
 	var uo untilOpts
@@ -653,13 +707,14 @@ func newPostsCreateURLResourcePostCmd(
 			if name != "" {
 				resourceData["title"] = name
 			}
-			return createResourceBackedPost(a, postType, resourceType, resourceData, name, bgID, pf, uo)
+			return createResourceBackedPost(a, postType, resourceType, resourceData, name, priority, bgID, pf, uo)
 		},
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
 	cmd.Flags().StringVar(&urlStr, "url", "", "URL")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
+	addPriorityFlag(cmd, &priority)
 	addPublishFlags(cmd, &pf)
 	addBackgroundFlag(cmd, &bgID)
 	addUntilFlag(cmd, &uo)
@@ -685,7 +740,7 @@ func newPostsCreateCalendarCmd() *cobra.Command {
 }
 
 func newPostsCreateIframeCmd() *cobra.Command {
-	var name, urlStr, htmlContent, imageURL string
+	var name, urlStr, htmlContent, imageURL, priority string
 	var bgID int
 	var pf publishOpts
 	var uo untilOpts
@@ -748,7 +803,7 @@ func newPostsCreateIframeCmd() *cobra.Command {
 				resourceData["url"] = imageURL
 			}
 
-			return createResourceBackedPost(a, "iframe", resourceType, resourceData, name, bgID, pf, uo)
+			return createResourceBackedPost(a, "iframe", resourceType, resourceData, name, priority, bgID, pf, uo)
 		},
 	}
 
@@ -757,6 +812,7 @@ func newPostsCreateIframeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display")
 	cmd.Flags().StringVar(&imageURL, "image", "", "Image URL to display (https only)")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
+	addPriorityFlag(cmd, &priority)
 	addPublishFlags(cmd, &pf)
 	addBackgroundFlag(cmd, &bgID)
 	addUntilFlag(cmd, &uo)
@@ -764,7 +820,7 @@ func newPostsCreateIframeCmd() *cobra.Command {
 }
 
 func newPostsCreateHTMLCmd() *cobra.Command {
-	var name, htmlContent string
+	var name, htmlContent, priority string
 	var bgID int
 	var pf publishOpts
 	var uo untilOpts
@@ -794,13 +850,14 @@ func newPostsCreateHTMLCmd() *cobra.Command {
 			if name != "" {
 				resourceData["title"] = name
 			}
-			return createResourceBackedPost(a, "iframe", "html", resourceData, name, bgID, pf, uo)
+			return createResourceBackedPost(a, "iframe", "html", resourceData, name, priority, bgID, pf, uo)
 		},
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Post name")
 	cmd.Flags().StringVar(&htmlContent, "html", "", "HTML content to display")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
+	addPriorityFlag(cmd, &priority)
 	addPublishFlags(cmd, &pf)
 	addBackgroundFlag(cmd, &bgID)
 	addUntilFlag(cmd, &uo)
@@ -808,7 +865,7 @@ func newPostsCreateHTMLCmd() *cobra.Command {
 }
 
 func newPostsCreatePosterCmd() *cobra.Command {
-	var name, sourceID string
+	var name, sourceID, priority string
 	var colorPaletteID, bgID int
 	var pf publishOpts
 	var uo untilOpts
@@ -837,6 +894,9 @@ func newPostsCreatePosterCmd() *cobra.Command {
 			post := map[string]any{}
 			if name != "" {
 				post["name"] = name
+			}
+			if err := applyPriority(post, priority); err != nil {
+				return err
 			}
 			applyBackground(post, bgID)
 
@@ -893,6 +953,7 @@ func newPostsCreatePosterCmd() *cobra.Command {
 	cmd.Flags().StringVar(&sourceID, "source-id", "", "Network poster template ID to duplicate")
 	cmd.Flags().IntVar(&colorPaletteID, "color-palette-id", 0, "Color palette ID to apply to the poster")
 	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Fill fields interactively")
+	addPriorityFlag(cmd, &priority)
 	addPublishFlags(cmd, &pf)
 	addBackgroundFlag(cmd, &bgID)
 	addUntilFlag(cmd, &uo)
@@ -900,7 +961,7 @@ func newPostsCreatePosterCmd() *cobra.Command {
 }
 
 func newPostsCreateCounterCmd() *cobra.Command {
-	var name, title, template, countdownType string
+	var name, title, template, countdownType, priority string
 	var targetDate, targetTime, fromDate, fromTime string
 	var countdownFormat, timeZone string
 	var description, smallLabel, finishedTitle, finishedDescription, primaryColor string
@@ -995,6 +1056,9 @@ func newPostsCreateCounterCmd() *cobra.Command {
 			setStr("repeat-delay-unit", "repeat_delay_unit", repeatDelayUnit)
 			setInt("repeat-delay", "repeat_delay", repeatDelay)
 			setInt("finished-media-box", "countdown_finished_media_box_id", finishedMediaBoxID)
+			if err := applyPriority(post, priority); err != nil {
+				return err
+			}
 			applyBackground(post, bgID)
 
 			var postResp map[string]any
@@ -1046,6 +1110,7 @@ func newPostsCreateCounterCmd() *cobra.Command {
 	cmd.Flags().StringVar(&repeatable, "repeatable", "", "Repeat cycle: none, daily, weekly, or yearly")
 	cmd.Flags().IntVar(&repeatDelay, "repeat-delay", 0, "Repeat delay value")
 	cmd.Flags().StringVar(&repeatDelayUnit, "repeat-delay-unit", "", "Repeat delay unit: seconds, minutes, or hours")
+	addPriorityFlag(cmd, &priority)
 	addPublishFlags(cmd, &pf)
 	addBackgroundFlag(cmd, &bgID)
 	addUntilFlag(cmd, &uo)

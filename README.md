@@ -260,7 +260,7 @@ pintomind posts delete <id> --force
 
 **Create posts with typed subcommands:**
 
-Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, `--background-media-box <id>` (MediaBox id used as the post background — create one first with `pintomind media-boxes create ...`), plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
+Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, `--background-media-box <id>` (MediaBox id used as the post background — create one first with `pintomind media-boxes create ...`), `--priority <value>` (playback priority, see below), plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
 
 ```bash
 # Image post — upload files and/or reference existing media IDs
@@ -308,6 +308,23 @@ Image templates: `center` (centered, full image), `maxpane` (fill, full image), 
 Plain post layout: by default the server picks a grid layout from the body content, media count, and media shape. Pass `--variation <name>` (or `"variation"` in `--data`) to force a named layout, or `auto` to re-run the automatic selection — useful in `posts update` since omitting `variation` there preserves the current layout. `pintomind schemas show post_plain` lists every layout name, and its `x-variation-details` object describes each one (slot counts, composition, when auto picks it).
 
 Any post type accepts `background_id` (a MediaBox id) as a post background. Pass `null` in `posts update --data` to clear.
+
+Any post type also accepts `priority` (`--priority` on the create subcommands, or `"priority"` in `--data`), controlling how often the post plays in the rotation:
+
+| Value | Behavior |
+|---|---|
+| `once_per_round` | Normal rotation (default) |
+| `twice_per_round` | Shows twice each rotation |
+| `between_each_post` | Inserted after every other post in its area |
+| `only_post_in_area` | Suppresses the other posts in its area |
+| `only_post_in_channel` | Suppresses all other channel posts and fills the screen |
+| `every_other_round` | Shows once every two rotations |
+| `once_per_hour` | Shows on publication, then at most hourly |
+
+```bash
+pintomind posts create image --image ./alert.jpg --channel-id 7 --priority only_post_in_channel
+pintomind posts update <id> --data '{"priority":"once_per_round"}'   # back to normal rotation
+```
 
 **Publications — manage where a post is displayed:**
 
