@@ -9,11 +9,83 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type ScreenChannel struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
 type Screen struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	Online    bool   `json:"online"`
-	ChannelID any    `json:"channel_id"`
+	ID            int            `json:"id"`
+	Name          string         `json:"name"`
+	Online        bool           `json:"online"`
+	OnlineSince   string         `json:"online_since"`
+	OfflineSince  string         `json:"offline_since"`
+	LastStartupAt string         `json:"last_startup_at"`
+	Channel       *ScreenChannel `json:"channel"`
+}
+
+// screenTableHeaders and screenTableRows render the shared screen list/watch table.
+var screenTableHeaders = []string{"ID", "NAME", "STATUS", "LAST_STARTUP", "CHANNEL"}
+
+func screenTableRows(items []Screen) [][]string {
+	rows := make([][]string, len(items))
+	for i, s := range items {
+		status := "offline"
+		since := s.OfflineSince
+		if s.Online {
+			status = "online"
+			since = s.OnlineSince
+		}
+		if d, ok := durationSince(since); ok {
+			status += " for " + humanDuration(d)
+		}
+		startup := "-"
+		if d, ok := durationSince(s.LastStartupAt); ok {
+			startup = humanDuration(d) + " ago"
+		}
+		ch := "-"
+		if s.Channel != nil {
+			ch = fmt.Sprintf("%s (%d)", s.Channel.Name, s.Channel.ID)
+		}
+		rows[i] = []string{strconv.Itoa(s.ID), s.Name, status, startup, ch}
+	}
+	return rows
+}
+
+// durationSince parses an API timestamp and returns the elapsed time.
+func durationSince(ts string) (time.Duration, bool) {
+	if ts == "" {
+		return 0, false
+	}
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return 0, false
+	}
+	return time.Since(t), true
+}
+
+// humanDuration formats a duration as a rough human-readable amount ("2 hours", "3 days").
+func humanDuration(d time.Duration) string {
+	plural := func(n int, unit string) string {
+		if n == 1 {
+			return fmt.Sprintf("1 %s", unit)
+		}
+		return fmt.Sprintf("%d %ss", n, unit)
+	}
+	switch {
+	case d < time.Minute:
+		return "less than a minute"
+	case d < time.Hour:
+		return plural(int(d.Minutes()), "minute")
+	case d < 24*time.Hour:
+		return plural(int(d.Hours()), "hour")
+	case d < 30*24*time.Hour:
+		return plural(int(d.Hours()/24), "day")
+	case d < 365*24*time.Hour:
+		return plural(int(d.Hours()/(24*30)), "month")
+	default:
+		return plural(int(d.Hours()/(24*365)), "year")
+	}
 }
 
 type ScreensResponse struct {
@@ -215,19 +287,7 @@ func newScreensListCmd() *cobra.Command {
 			}
 
 			fmt.Printf("Total: %d\n\n", resp.Total)
-			rows := make([][]string, len(resp.Items))
-			for i, s := range resp.Items {
-				status := "offline"
-				if s.Online {
-					status = "online"
-				}
-				ch := "-"
-				if s.ChannelID != nil {
-					ch = fmt.Sprint(s.ChannelID)
-				}
-				rows[i] = []string{strconv.Itoa(s.ID), s.Name, status, ch}
-			}
-			printTable(cmd, []string{"ID", "NAME", "STATUS", "CHANNEL"}, rows)
+			printTable(cmd, screenTableHeaders, screenTableRows(resp.Items))
 			return nil
 		},
 	}
@@ -499,19 +559,7 @@ func newScreensWatchCmd() *cobra.Command {
 				fmt.Print("\033[H\033[2J")
 				fmt.Printf("Screens — %s  (refreshing every %ds, Ctrl+C to quit)\n\n",
 					time.Now().Format("15:04:05"), interval)
-				rows := make([][]string, len(resp.Items))
-				for i, s := range resp.Items {
-					status := "offline"
-					if s.Online {
-						status = "online"
-					}
-					ch := "-"
-					if s.ChannelID != nil {
-						ch = fmt.Sprint(s.ChannelID)
-					}
-					rows[i] = []string{strconv.Itoa(s.ID), s.Name, status, ch}
-				}
-				printTable(cmd, []string{"ID", "NAME", "STATUS", "CHANNEL"}, rows)
+				printTable(cmd, screenTableHeaders, screenTableRows(resp.Items))
 				return nil
 			}
 
