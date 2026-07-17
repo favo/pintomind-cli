@@ -65,7 +65,7 @@ func NewScreensCmd() *cobra.Command {
 		newScreenActionCmd("clear-cache", "Clear the screen cache", "clear_cache", ""),
 		newScreenActionCmd("upgrade-firmware", "Upgrade screen firmware", "upgrade_firmware", ""),
 		newScreenActionCmd("identify", "Identify the screen (shows overlay)", "identify", ""),
-		newScreenActionCmd("toggle-night-mode", "Toggle night mode on the screen", "toggle_night_mode", ""),
+		newScreensToggleNightModeCmd(),
 		newScreenActionCmd("next", "Skip to next content", "remote_control", "next"),
 		newScreenActionCmd("previous", "Go to previous content", "remote_control", "previous"),
 		newScreenActionCmd("play", "Play content", "remote_control", "play"),
@@ -128,6 +128,61 @@ func newScreenActionCmd(name, short, apiCommand, signal string) *cobra.Command {
 				fmt.Sprintf("Sent %q to %s", label, target))
 		},
 	}
+	addTargetFlags(cmd)
+	return cmd
+}
+
+func newScreensToggleNightModeCmd() *cobra.Command {
+	var on, off bool
+
+	cmd := &cobra.Command{
+		Use:   "toggle-night-mode [id]",
+		Short: "Toggle night mode on the screen (--on / --off to force a state)",
+		Example: `  pintomind screens toggle-night-mode 42          # toggle current state
+  pintomind screens toggle-night-mode 42 --on    # force night mode on
+  pintomind screens toggle-night-mode --all --off`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if on && off {
+				return fmt.Errorf("--on and --off are mutually exclusive")
+			}
+
+			ids, _ := cmd.Flags().GetString("ids")
+			all, _ := cmd.Flags().GetBool("all")
+
+			singleID := ""
+			if len(args) == 1 {
+				singleID = args[0]
+			}
+
+			targetIDs, bulk, err := resolveScreenIDs(cmd, singleID, ids, all)
+			if err != nil {
+				return err
+			}
+
+			screen := map[string]any{"command": "toggle_night_mode"}
+			label := "toggle-night-mode"
+			if on {
+				screen["state"] = true
+				label = "night mode on"
+			}
+			if off {
+				screen["state"] = false
+				label = "night mode off"
+			}
+			body := map[string]any{"screen": screen}
+
+			target := "screen " + targetIDs
+			if bulk {
+				target = "screens " + targetIDs
+			}
+
+			return sendScreenPatch(cmd, targetIDs, bulk, body,
+				fmt.Sprintf("Sent %q to %s", label, target))
+		},
+	}
+	cmd.Flags().BoolVar(&on, "on", false, "Force night mode on instead of toggling")
+	cmd.Flags().BoolVar(&off, "off", false, "Force night mode off instead of toggling")
 	addTargetFlags(cmd)
 	return cmd
 }

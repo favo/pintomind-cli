@@ -194,7 +194,7 @@ pintomind screens reboot            [id|--ids ...|--all]
 pintomind screens clear-cache       [id|--ids ...|--all]
 pintomind screens upgrade-firmware  [id|--ids ...|--all]
 pintomind screens identify          [id|--ids ...|--all]
-pintomind screens toggle-night-mode [id|--ids ...|--all]
+pintomind screens toggle-night-mode [id|--ids ...|--all]   # --on / --off forces a state instead of toggling
 ```
 
 **Remote control signals:**
