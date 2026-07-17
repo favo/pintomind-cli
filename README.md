@@ -161,6 +161,11 @@ pintomind network      # Show network identity and stats (requires network token
 ### Screens
 
 ```bash
+pintomind screens connect 12ABC                    # Connect a new screen using the code it displays
+pintomind screens connect 12ABC --channel-id 17    # ...and show a channel immediately
+pintomind screens connect 12ABC --name "Lobby screen" --notes "Reception desk"   # ...with name and notes
+pintomind screens update 42 --name "Lobby screen"
+pintomind screens update 42 --notes "Behind the reception desk"
 pintomind screens list
 pintomind screens list --online          # Only online screens
 pintomind screens list --offline         # Only offline screens

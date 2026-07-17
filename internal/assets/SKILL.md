@@ -26,6 +26,10 @@ pintomind connection show   # show active connection and masked API key
 ## Screens
 
 ```bash
+pintomind screens connect <code>                  # connect a new screen using the code it displays
+pintomind screens connect <code> --channel-id 17  # ...and show a channel immediately
+pintomind screens connect <code> --name "Lobby" --notes "Reception desk"  # ...with name and notes
+pintomind screens update <id> --name "Lobby" --notes "Reception desk"     # rename / set notes (empty --notes clears)
 pintomind screens list
 pintomind screens list --online
 pintomind screens list --offline

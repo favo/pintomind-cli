@@ -49,6 +49,8 @@ func NewScreensCmd() *cobra.Command {
 	addTo(groupCommands,
 		newScreensListCmd(),
 		newScreensShowCmd(),
+		newScreensConnectCmd(),
+		newScreensUpdateCmd(),
 		newScreensStatsCmd(),
 		newScreensWatchCmd(),
 		newScreensWaitOnlineCmd(),
@@ -195,6 +197,97 @@ func newScreensShowCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newScreensUpdateCmd() *cobra.Command {
+	var name, notes string
+
+	cmd := &cobra.Command{
+		Use:   "update <id> [--name <name>] [--notes <notes>]",
+		Short: "Update a screen's name and notes",
+		Example: `  pintomind screens update 42 --name "Lobby screen"
+  pintomind screens update 42 --notes "Behind the reception desk"
+  pintomind screens update 42 --name "Lobby screen" --notes ""   # empty --notes clears them`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			screen := map[string]any{}
+			if cmd.Flags().Changed("name") {
+				screen["name"] = name
+			}
+			if cmd.Flags().Changed("notes") {
+				screen["notes"] = notes
+			}
+			if len(screen) == 0 {
+				return fmt.Errorf("pass --name and/or --notes")
+			}
+			var resp map[string]any
+			if err := a.Client.Patch("/screens/"+args[0], map[string]any{"screen": screen}, &resp); err != nil {
+				return err
+			}
+			if a.JSONOutput {
+				printJSON(resp)
+				return nil
+			}
+			fmt.Printf("Updated screen %s\n", args[0])
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "Screen name (blank names are ignored by the API)")
+	cmd.Flags().StringVar(&notes, "notes", "", "Screen notes (pass an empty string to clear)")
+	return cmd
+}
+
+func newScreensConnectCmd() *cobra.Command {
+	var name, notes string
+	var channelID int
+
+	cmd := &cobra.Command{
+		Use:   "connect <code>",
+		Short: "Connect a new screen using the code shown on it",
+		Long: `Connect a new screen to your account using the short-lived code displayed on it.
+
+A valid code can only be used once. Optionally pass --channel-id to show a
+channel on the screen immediately, --name to name the screen (a name is
+generated otherwise), and --notes to add notes. Limited to 10 attempts per
+API key in a 10-minute window.`,
+		Example: `  pintomind screens connect 12ABC
+  pintomind screens connect 12ABC --channel-id 17
+  pintomind screens connect 12ABC --channel-id 17 --name "Lobby screen" --notes "Behind the reception desk"`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			screen := map[string]any{"code": args[0]}
+			if channelID > 0 {
+				screen["channel_id"] = channelID
+			}
+			if name != "" {
+				screen["name"] = name
+			}
+			if notes != "" {
+				screen["notes"] = notes
+			}
+			var resp map[string]any
+			if err := a.Client.Post("/screens", map[string]any{"screen": screen}, &resp); err != nil {
+				return err
+			}
+			if a.JSONOutput {
+				printJSON(resp)
+				return nil
+			}
+			id, _ := resp["id"].(float64)
+			name, _ := resp["name"].(string)
+			fmt.Printf("Connected screen %d (%s)\n", int(id), name)
+			if channelID > 0 {
+				fmt.Printf("Showing channel %d\n", channelID)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "Screen name (generated if omitted)")
+	cmd.Flags().StringVar(&notes, "notes", "", "Screen notes")
+	cmd.Flags().IntVar(&channelID, "channel-id", 0, "Channel to show on the screen immediately")
+	return cmd
 }
 
 func newScreensStatsCmd() *cobra.Command {
