@@ -93,13 +93,22 @@ func newPostsAttachmentsListCmd() *cobra.Command {
 	}
 }
 
-// createAttachment posts an attachment and prints the JSON response.
-func createAttachment(a *appctx.App, postID, attachmentType string, attachment map[string]any) error {
+// postAttachment creates an attachment and returns the API response.
+func postAttachment(a *appctx.App, postID, attachmentType string, attachment map[string]any) (map[string]any, error) {
 	var resp map[string]any
 	if err := a.Client.Post("/posts/"+postID+"/attachments", map[string]any{
 		"type":       attachmentType,
 		"attachment": attachment,
 	}, &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// createAttachment posts an attachment and prints the JSON response.
+func createAttachment(a *appctx.App, postID, attachmentType string, attachment map[string]any) error {
+	resp, err := postAttachment(a, postID, attachmentType, attachment)
+	if err != nil {
 		return err
 	}
 	printJSON(resp)
@@ -188,11 +197,15 @@ the default document collection first (override with --media-collection).`,
 			if err != nil {
 				return err
 			}
+			attachments := make([]any, 0, len(mediaIDs))
 			for _, id := range mediaIDs {
-				if err := createAttachment(a, args[0], "document", map[string]any{"media_id": id}); err != nil {
+				resp, err := postAttachment(a, args[0], "document", map[string]any{"media_id": id})
+				if err != nil {
 					return err
 				}
+				attachments = append(attachments, resp["attachment"])
 			}
+			printJSON(map[string]any{"success": true, "total": len(attachments), "attachments": attachments})
 			return nil
 		},
 	}
