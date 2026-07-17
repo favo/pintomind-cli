@@ -265,7 +265,7 @@ pintomind posts delete <id> --force
 
 **Create posts with typed subcommands:**
 
-Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, `--position <n>` (0-based play-order position within the channel area; omit for the channel default), `--background-media-box <id>` (MediaBox id used as the post background — create one first with `pintomind media-boxes create ...`), `--priority <value>` (playback priority, see below), plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
+Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, `--position <n>` (0-based play-order position within the channel area; omit for the channel default), `--background-media-box <id>` (MediaBox id used as the post background — create one first with `pintomind media-boxes create ...`), `--priority <value>` (playback priority, see below), `--document <file-or-url>` (repeatable; uploads to the document media collection and attaches it as a Go document attachment), plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
 
 ```bash
 # Image post — upload files and/or reference existing media IDs
@@ -381,6 +381,30 @@ pintomind posts notifications cancel <post-id> <notification-id> # Cancel a pend
 ```
 
 `--send-at` is a required future ISO 8601 datetime. The list shows delivery counts (`SENT`) and opens (`READ`) for already-sent notifications.
+
+**Attachments — extra content shown with a post in the Go mobile app:**
+
+Three types: `text` (max one per post — edit it with `update` instead of adding another), `link` (a button; types: `link`, `mail`, `sms`, `tel`, `go_channel`), and `document` (references media in a document media collection). For `mail`, `sms`, and `tel` links, `--url` is the email address or phone number.
+
+```bash
+pintomind posts attachments list <post-id>
+pintomind posts attachments add text <post-id> --text "<p>More info</p>" --alignment center
+pintomind posts attachments add link <post-id> --url https://example.com --label "Sign up"
+pintomind posts attachments add link <post-id> --url hi@example.com --link-type mail
+pintomind posts attachments add link <post-id> --url +4712345678 --link-type tel
+pintomind posts attachments add document <post-id> --media 42          # existing document media
+pintomind posts attachments add document <post-id> --file ./menu.pdf   # upload, then attach
+pintomind posts attachments update <post-id> <attachment-id> --text "<p>Updated</p>"
+pintomind posts attachments delete <post-id> <attachment-id>
+```
+
+When creating a post, `--document <file-or-url>` (repeatable) does the document upload + attach in one go:
+
+```bash
+pintomind posts create image --image ./poster.jpg --document ./menu.pdf --channel-id 7
+```
+
+See `pintomind posts schema attachments` for the JSON schema.
 
 ### Resources
 

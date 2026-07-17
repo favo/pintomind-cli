@@ -60,7 +60,9 @@ func NewPostsCmd() *cobra.Command {
 	cmd.AddCommand(newPostsUnpublishCmd())
 	cmd.AddCommand(newPostsScheduleCmd())
 	cmd.AddCommand(newPostsNotificationsCmd())
+	cmd.AddCommand(newPostsAttachmentsCmd())
 	cmd.AddCommand(newSchemaSubCmd(map[string]string{
+		"attachments": "post_attachments",
 		"calendar":    "post_calendar",
 		"clock":       "post_clock",
 		"counter":     "post_counter",

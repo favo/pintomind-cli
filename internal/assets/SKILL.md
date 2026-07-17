@@ -274,6 +274,7 @@ All `posts create <type>` helpers accept:
 - `--channel-id N` (repeatable) — publish to one or more channels immediately
 - `--area F11` — channel area for all publications
 - `--position N` — 0-based play-order position within the channel area (0 = first; omit for channel default)
+- `--document <file-or-url>` (repeatable) — upload into the document media collection and attach as a Go document attachment
 - `--full-screen` — publish fullscreen to all channels
 - `--priority <value>` — playback priority: `once_per_round` (default), `twice_per_round`, `between_each_post`, `only_post_in_area`, `only_post_in_channel`, `every_other_round`, `once_per_hour`. Any post schema (`pintomind schemas show post_<alias>`) describes each value's behavior.
 - `--until <YYYY-MM-DD[THH:MM]>` — auto-expire the post at this date/time (attaches a one-period schedule that unpublishes on expiry). Time defaults to `23:59` when omitted.
@@ -318,6 +319,24 @@ Flag syntax for `set`:
 Inspect the JSON schema with `pintomind posts schema time-schedule`.
 
 Time zones: weekdays and times are evaluated in the time zone of the channel the post is published to, not in your local zone. A post published to channels in different time zones turns on/off at each channel's local wall-clock time.
+
+### Post attachments (Go mobile app)
+
+Attachments are extra content shown with a post in the branded Go mobile app. Types: `text` (max one per post — edit the existing one instead of adding another), `link` (a tappable button; `link_type`: `link`, `mail`, `sms`, `tel`, `go_channel`; `url` is the email address or phone number for `mail`/`sms`/`tel`), `document` (references media in a document media collection). Schema: `pintomind schemas show post_attachments`.
+
+```bash
+pintomind posts attachments list <post-id>
+pintomind posts attachments add text <post-id> --text "<p>More info</p>" --alignment center
+pintomind posts attachments add link <post-id> --url https://example.com --label "Sign up"
+pintomind posts attachments add link <post-id> --url hi@example.com --link-type mail
+pintomind posts attachments add link <post-id> --url +4712345678 --link-type tel
+pintomind posts attachments add document <post-id> --media 42          # existing document media
+pintomind posts attachments add document <post-id> --file ./menu.pdf   # upload to document collection, then attach
+pintomind posts attachments update <post-id> <attachment-id> --text "<p>Updated</p>"   # pass only fields to change
+pintomind posts attachments delete <post-id> <attachment-id> --force
+```
+
+Shortcut at creation time: every `posts create <type>` helper accepts `--document <file-or-url>` (repeatable) — uploads into the default document media collection and attaches after the post is created.
 
 ### Creating posts — raw JSON (all post types)
 
