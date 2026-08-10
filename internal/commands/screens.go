@@ -9,11 +9,83 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type ScreenChannel struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
 type Screen struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	Online    bool   `json:"online"`
-	ChannelID any    `json:"channel_id"`
+	ID            int            `json:"id"`
+	Name          string         `json:"name"`
+	Online        bool           `json:"online"`
+	OnlineSince   string         `json:"online_since"`
+	OfflineSince  string         `json:"offline_since"`
+	LastStartupAt string         `json:"last_startup_at"`
+	Channel       *ScreenChannel `json:"channel"`
+}
+
+// screenTableHeaders and screenTableRows render the shared screen list/watch table.
+var screenTableHeaders = []string{"ID", "NAME", "STATUS", "LAST_STARTUP", "CHANNEL"}
+
+func screenTableRows(items []Screen) [][]string {
+	rows := make([][]string, len(items))
+	for i, s := range items {
+		status := "offline"
+		since := s.OfflineSince
+		if s.Online {
+			status = "online"
+			since = s.OnlineSince
+		}
+		if d, ok := durationSince(since); ok {
+			status += " for " + humanDuration(d)
+		}
+		startup := "-"
+		if d, ok := durationSince(s.LastStartupAt); ok {
+			startup = humanDuration(d) + " ago"
+		}
+		ch := "-"
+		if s.Channel != nil {
+			ch = fmt.Sprintf("%s (%d)", s.Channel.Name, s.Channel.ID)
+		}
+		rows[i] = []string{strconv.Itoa(s.ID), s.Name, status, startup, ch}
+	}
+	return rows
+}
+
+// durationSince parses an API timestamp and returns the elapsed time.
+func durationSince(ts string) (time.Duration, bool) {
+	if ts == "" {
+		return 0, false
+	}
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return 0, false
+	}
+	return time.Since(t), true
+}
+
+// humanDuration formats a duration as a rough human-readable amount ("2 hours", "3 days").
+func humanDuration(d time.Duration) string {
+	plural := func(n int, unit string) string {
+		if n == 1 {
+			return fmt.Sprintf("1 %s", unit)
+		}
+		return fmt.Sprintf("%d %ss", n, unit)
+	}
+	switch {
+	case d < time.Minute:
+		return "less than a minute"
+	case d < time.Hour:
+		return plural(int(d.Minutes()), "minute")
+	case d < 24*time.Hour:
+		return plural(int(d.Hours()), "hour")
+	case d < 30*24*time.Hour:
+		return plural(int(d.Hours()/24), "day")
+	case d < 365*24*time.Hour:
+		return plural(int(d.Hours()/(24*30)), "month")
+	default:
+		return plural(int(d.Hours()/(24*365)), "year")
+	}
 }
 
 type ScreensResponse struct {
@@ -49,6 +121,8 @@ func NewScreensCmd() *cobra.Command {
 	addTo(groupCommands,
 		newScreensListCmd(),
 		newScreensShowCmd(),
+		newScreensConnectCmd(),
+		newScreensUpdateCmd(),
 		newScreensStatsCmd(),
 		newScreensWatchCmd(),
 		newScreensWaitOnlineCmd(),
@@ -63,7 +137,7 @@ func NewScreensCmd() *cobra.Command {
 		newScreenActionCmd("clear-cache", "Clear the screen cache", "clear_cache", ""),
 		newScreenActionCmd("upgrade-firmware", "Upgrade screen firmware", "upgrade_firmware", ""),
 		newScreenActionCmd("identify", "Identify the screen (shows overlay)", "identify", ""),
-		newScreenActionCmd("toggle-night-mode", "Toggle night mode on the screen", "toggle_night_mode", ""),
+		newScreensToggleNightModeCmd(),
 		newScreenActionCmd("next", "Skip to next content", "remote_control", "next"),
 		newScreenActionCmd("previous", "Go to previous content", "remote_control", "previous"),
 		newScreenActionCmd("play", "Play content", "remote_control", "play"),
@@ -130,6 +204,61 @@ func newScreenActionCmd(name, short, apiCommand, signal string) *cobra.Command {
 	return cmd
 }
 
+func newScreensToggleNightModeCmd() *cobra.Command {
+	var on, off bool
+
+	cmd := &cobra.Command{
+		Use:   "toggle-night-mode [id]",
+		Short: "Toggle night mode on the screen (--on / --off to force a state)",
+		Example: `  pintomind screens toggle-night-mode 42          # toggle current state
+  pintomind screens toggle-night-mode 42 --on    # force night mode on
+  pintomind screens toggle-night-mode --all --off`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if on && off {
+				return fmt.Errorf("--on and --off are mutually exclusive")
+			}
+
+			ids, _ := cmd.Flags().GetString("ids")
+			all, _ := cmd.Flags().GetBool("all")
+
+			singleID := ""
+			if len(args) == 1 {
+				singleID = args[0]
+			}
+
+			targetIDs, bulk, err := resolveScreenIDs(cmd, singleID, ids, all)
+			if err != nil {
+				return err
+			}
+
+			screen := map[string]any{"command": "toggle_night_mode"}
+			label := "toggle-night-mode"
+			if on {
+				screen["state"] = true
+				label = "night mode on"
+			}
+			if off {
+				screen["state"] = false
+				label = "night mode off"
+			}
+			body := map[string]any{"screen": screen}
+
+			target := "screen " + targetIDs
+			if bulk {
+				target = "screens " + targetIDs
+			}
+
+			return sendScreenPatch(cmd, targetIDs, bulk, body,
+				fmt.Sprintf("Sent %q to %s", label, target))
+		},
+	}
+	cmd.Flags().BoolVar(&on, "on", false, "Force night mode on instead of toggling")
+	cmd.Flags().BoolVar(&off, "off", false, "Force night mode off instead of toggling")
+	addTargetFlags(cmd)
+	return cmd
+}
+
 func newScreensListCmd() *cobra.Command {
 	var online, offline bool
 
@@ -158,19 +287,7 @@ func newScreensListCmd() *cobra.Command {
 			}
 
 			fmt.Printf("Total: %d\n\n", resp.Total)
-			rows := make([][]string, len(resp.Items))
-			for i, s := range resp.Items {
-				status := "offline"
-				if s.Online {
-					status = "online"
-				}
-				ch := "-"
-				if s.ChannelID != nil {
-					ch = fmt.Sprint(s.ChannelID)
-				}
-				rows[i] = []string{strconv.Itoa(s.ID), s.Name, status, ch}
-			}
-			printTable(cmd, []string{"ID", "NAME", "STATUS", "CHANNEL"}, rows)
+			printTable(cmd, screenTableHeaders, screenTableRows(resp.Items))
 			return nil
 		},
 	}
@@ -195,6 +312,97 @@ func newScreensShowCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newScreensUpdateCmd() *cobra.Command {
+	var name, notes string
+
+	cmd := &cobra.Command{
+		Use:   "update <id> [--name <name>] [--notes <notes>]",
+		Short: "Update a screen's name and notes",
+		Example: `  pintomind screens update 42 --name "Lobby screen"
+  pintomind screens update 42 --notes "Behind the reception desk"
+  pintomind screens update 42 --name "Lobby screen" --notes ""   # empty --notes clears them`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			screen := map[string]any{}
+			if cmd.Flags().Changed("name") {
+				screen["name"] = name
+			}
+			if cmd.Flags().Changed("notes") {
+				screen["notes"] = notes
+			}
+			if len(screen) == 0 {
+				return fmt.Errorf("pass --name and/or --notes")
+			}
+			var resp map[string]any
+			if err := a.Client.Patch("/screens/"+args[0], map[string]any{"screen": screen}, &resp); err != nil {
+				return err
+			}
+			if a.JSONOutput {
+				printJSON(resp)
+				return nil
+			}
+			fmt.Printf("Updated screen %s\n", args[0])
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "Screen name (blank names are ignored by the API)")
+	cmd.Flags().StringVar(&notes, "notes", "", "Screen notes (pass an empty string to clear)")
+	return cmd
+}
+
+func newScreensConnectCmd() *cobra.Command {
+	var name, notes string
+	var channelID int
+
+	cmd := &cobra.Command{
+		Use:   "connect <code>",
+		Short: "Connect a new screen using the code shown on it",
+		Long: `Connect a new screen to your account using the short-lived code displayed on it.
+
+A valid code can only be used once. Optionally pass --channel-id to show a
+channel on the screen immediately, --name to name the screen (a name is
+generated otherwise), and --notes to add notes. Limited to 10 attempts per
+API key in a 10-minute window.`,
+		Example: `  pintomind screens connect 12ABC
+  pintomind screens connect 12ABC --channel-id 17
+  pintomind screens connect 12ABC --channel-id 17 --name "Lobby screen" --notes "Behind the reception desk"`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			screen := map[string]any{"code": args[0]}
+			if channelID > 0 {
+				screen["channel_id"] = channelID
+			}
+			if name != "" {
+				screen["name"] = name
+			}
+			if notes != "" {
+				screen["notes"] = notes
+			}
+			var resp map[string]any
+			if err := a.Client.Post("/screens", map[string]any{"screen": screen}, &resp); err != nil {
+				return err
+			}
+			if a.JSONOutput {
+				printJSON(resp)
+				return nil
+			}
+			id, _ := resp["id"].(float64)
+			name, _ := resp["name"].(string)
+			fmt.Printf("Connected screen %d (%s)\n", int(id), name)
+			if channelID > 0 {
+				fmt.Printf("Showing channel %d\n", channelID)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "Screen name (generated if omitted)")
+	cmd.Flags().StringVar(&notes, "notes", "", "Screen notes")
+	cmd.Flags().IntVar(&channelID, "channel-id", 0, "Channel to show on the screen immediately")
+	return cmd
 }
 
 func newScreensStatsCmd() *cobra.Command {
@@ -351,19 +559,7 @@ func newScreensWatchCmd() *cobra.Command {
 				fmt.Print("\033[H\033[2J")
 				fmt.Printf("Screens — %s  (refreshing every %ds, Ctrl+C to quit)\n\n",
 					time.Now().Format("15:04:05"), interval)
-				rows := make([][]string, len(resp.Items))
-				for i, s := range resp.Items {
-					status := "offline"
-					if s.Online {
-						status = "online"
-					}
-					ch := "-"
-					if s.ChannelID != nil {
-						ch = fmt.Sprint(s.ChannelID)
-					}
-					rows[i] = []string{strconv.Itoa(s.ID), s.Name, status, ch}
-				}
-				printTable(cmd, []string{"ID", "NAME", "STATUS", "CHANNEL"}, rows)
+				printTable(cmd, screenTableHeaders, screenTableRows(resp.Items))
 				return nil
 			}
 

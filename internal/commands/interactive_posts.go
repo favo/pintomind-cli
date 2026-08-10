@@ -291,7 +291,7 @@ func interactivePostImage(name *string, images *[]string, mediaIDs *[]int, durat
 }
 
 func interactivePostPlain(
-	name, heading, body, headingAlignment, bodyAlignment *string,
+	name, heading, body, variation, headingAlignment, bodyAlignment *string,
 	headingFontsize, bodyFontsize *int,
 	mbi *plainMediaBoxInputs,
 	p *publishOpts,
@@ -304,6 +304,9 @@ func interactivePostPlain(
 			huh.NewInput().Title("Post name (optional)").Value(name),
 			huh.NewText().Title("Heading HTML, at least one of heading/body required (optional)").Value(heading),
 			huh.NewText().Title("Body HTML, at least one of heading/body required (optional)").Value(body),
+			huh.NewInput().
+				Title("Layout variation, e.g. R12-HIT or auto (optional; see 'pintomind schemas show post_plain')").
+				Value(variation),
 		),
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -316,7 +319,7 @@ func interactivePostPlain(
 					huh.NewOption("Right", "right"),
 				),
 			huh.NewInput().
-				Title("Heading font size % 50–400 (optional, default 100)").
+				Title("Heading font size % 20–400 (optional, default 100)").
 				Value(&headingFontsizeStr).
 				Validate(validateOptionalFontsize),
 			huh.NewSelect[string]().
@@ -329,7 +332,7 @@ func interactivePostPlain(
 					huh.NewOption("Right", "right"),
 				),
 			huh.NewInput().
-				Title("Body font size % 50–400 (optional, default 100)").
+				Title("Body font size % 20–400 (optional, default 100)").
 				Value(&bodyFontsizeStr).
 				Validate(validateOptionalFontsize),
 		),
@@ -397,8 +400,8 @@ func validateOptionalFontsize(s string) error {
 	if err != nil {
 		return fmt.Errorf("must be an integer")
 	}
-	if v < 50 || v > 400 {
-		return fmt.Errorf("must be between 50 and 400")
+	if v < 20 || v > 400 {
+		return fmt.Errorf("must be between 20 and 400")
 	}
 	return nil
 }

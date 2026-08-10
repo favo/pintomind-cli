@@ -161,6 +161,11 @@ pintomind network      # Show network identity and stats (requires network token
 ### Screens
 
 ```bash
+pintomind screens connect 12ABC                    # Connect a new screen using the code it displays
+pintomind screens connect 12ABC --channel-id 17    # ...and show a channel immediately
+pintomind screens connect 12ABC --name "Lobby screen" --notes "Reception desk"   # ...with name and notes
+pintomind screens update 42 --name "Lobby screen"
+pintomind screens update 42 --notes "Behind the reception desk"
 pintomind screens list
 pintomind screens list --online          # Only online screens
 pintomind screens list --offline         # Only offline screens
@@ -189,7 +194,7 @@ pintomind screens reboot            [id|--ids ...|--all]
 pintomind screens clear-cache       [id|--ids ...|--all]
 pintomind screens upgrade-firmware  [id|--ids ...|--all]
 pintomind screens identify          [id|--ids ...|--all]
-pintomind screens toggle-night-mode [id|--ids ...|--all]
+pintomind screens toggle-night-mode [id|--ids ...|--all]   # --on / --off forces a state instead of toggling
 ```
 
 **Remote control signals:**
@@ -238,6 +243,11 @@ pintomind channels list --sort-by name
 pintomind channels list --page 2 --per-page 50
 pintomind channels show <id>
 pintomind channels posts <id>            # Requires account token
+pintomind channels posts <id> --visible                # only currently visible publications
+pintomind channels posts <id> --hidden                 # only currently hidden publications
+pintomind channels posts <id> --sort-by position       # play order (also: area, created_at, updated_at; append :desc)
+pintomind channels posts <id> --sort-by area,position --page 2 --per-page 50
+pintomind channels posts <id> --fields id,title,position,will_be_visible_at --json
 pintomind channels stats                 # Requires channels:read:stats scope
 pintomind channels stats <id>
 pintomind channels set-theme <channel-id> <theme-id>
@@ -260,7 +270,7 @@ pintomind posts delete <id> --force
 
 **Create posts with typed subcommands:**
 
-Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, `--background-media-box <id>` (MediaBox id used as the post background — create one first with `pintomind media-boxes create ...`), plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
+Each subcommand accepts `--channel-id` (repeatable), `--area`, `--full-screen`, `--position <n>` (0-based play-order position within the channel area; omit for the channel default), `--background-media-box <id>` (MediaBox id used as the post background — create one first with `pintomind media-boxes create ...`), `--priority <value>` (playback priority, see below), `--document <file-or-url>` (repeatable; uploads to the document media collection and attaches it as a Go document attachment), plus `--until <YYYY-MM-DD[THH:MM]>` to auto-expire (unpublish) the post after creation.
 
 ```bash
 # Image post — upload files and/or reference existing media IDs
@@ -273,6 +283,7 @@ pintomind posts create image --image ./photo.jpg --template fullpane  # center |
 # Plain text post
 pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
 pintomind posts create plain --name "Msg" --body "<p>Content</p>" --body-alignment center --body-fontsize 150
+pintomind posts create plain --name "Duo" --heading "<p>Hi</p>" --body "<p>Text</p>" --media 42 --media 43 --variation R13-HTII
 
 # Feed post (creates an RSS/Atom resource automatically)
 pintomind posts create feed --name "News" --url https://rss.example.com --channel-id 7
@@ -298,12 +309,32 @@ pintomind posts create poster --name "Brand poster" --source-id <template-id> --
 ```bash
 pintomind posts create --type image --data '{"name":"Spring","duration_per_item":7,"images":[{"media_id":42}],"template":"fullpane"}'
 pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","body":"<p>World</p>","media_box_ids":[201,202],"background_id":301}'
+pintomind posts create --type plain --data '{"heading":"<p>Hello</p>","media_box_ids":[201,202],"variation":"R121-HIIT"}'
 pintomind posts create --type poster --source-id <template-id> --data '{"name":"My poster"}'
 ```
 
 Image templates: `center` (centered, full image), `maxpane` (fill, full image), `fullpane` (fill, cropped), `image_grid` (mosaic). The legacy `aspect_ratio` / `grid_layout` / `variation` fields are no longer accepted.
 
+Plain post layout: by default the server picks a grid layout from the body content, media count, and media shape. Pass `--variation <name>` (or `"variation"` in `--data`) to force a named layout, or `auto` to re-run the automatic selection — useful in `posts update` since omitting `variation` there preserves the current layout. `pintomind schemas show post_plain` lists every layout name, and its `x-variation-details` object describes each one (slot counts, composition, when auto picks it).
+
 Any post type accepts `background_id` (a MediaBox id) as a post background. Pass `null` in `posts update --data` to clear.
+
+Any post type also accepts `priority` (`--priority` on the create subcommands, or `"priority"` in `--data`), controlling how often the post plays in the rotation:
+
+| Value | Behavior |
+|---|---|
+| `once_per_round` | Normal rotation (default) |
+| `twice_per_round` | Shows twice each rotation |
+| `between_each_post` | Inserted after every other post in its area |
+| `only_post_in_area` | Suppresses the other posts in its area |
+| `only_post_in_channel` | Suppresses all other channel posts and fills the screen |
+| `every_other_round` | Shows once every two rotations |
+| `once_per_hour` | Shows on publication, then at most hourly |
+
+```bash
+pintomind posts create image --image ./alert.jpg --channel-id 7 --priority only_post_in_channel
+pintomind posts update <id> --data '{"priority":"once_per_round"}'   # back to normal rotation
+```
 
 **Publications — manage where a post is displayed:**
 
@@ -313,6 +344,7 @@ pintomind posts publish <post-id> --channel-id 7                # Publish to one
 pintomind posts publish <post-id> --channel-id 7 --channel-id 12  # Publish to multiple channels in one call
 pintomind posts publish <post-id> --channel-id 7 --area F11
 pintomind posts publish <post-id> --channel-id 7 --full-screen
+pintomind posts publish <post-id> --channel-id 7 --position 0    # first in the area's play order
 pintomind posts unpublish <post-id>                             # Unpublish from ALL channels
 pintomind posts unpublish <post-id> --channel-id 7              # Unpublish from specific channel(s)
 pintomind posts unpublish <post-id> --channel-id 7 --channel-id 12 --force
@@ -354,6 +386,30 @@ pintomind posts notifications cancel <post-id> <notification-id> # Cancel a pend
 ```
 
 `--send-at` is a required future ISO 8601 datetime. The list shows delivery counts (`SENT`) and opens (`READ`) for already-sent notifications.
+
+**Attachments — extra content shown with a post in the Go mobile app:**
+
+Three types: `text` (max one per post — edit it with `update` instead of adding another), `link` (a button; types: `link`, `mail`, `sms`, `tel`, `go_channel`), and `document` (references media in a document media collection). For `mail`, `sms`, and `tel` links, `--url` is the email address or phone number.
+
+```bash
+pintomind posts attachments list <post-id>
+pintomind posts attachments add text <post-id> --text "<p>More info</p>" --alignment center
+pintomind posts attachments add link <post-id> --url https://example.com --label "Sign up"
+pintomind posts attachments add link <post-id> --url hi@example.com --link-type mail
+pintomind posts attachments add link <post-id> --url +4712345678 --link-type tel
+pintomind posts attachments add document <post-id> --media 42          # existing document media
+pintomind posts attachments add document <post-id> --file ./menu.pdf   # upload, then attach
+pintomind posts attachments update <post-id> <attachment-id> --text "<p>Updated</p>"
+pintomind posts attachments delete <post-id> <attachment-id>
+```
+
+When creating a post, `--document <file-or-url>` (repeatable) does the document upload + attach in one go:
+
+```bash
+pintomind posts create image --image ./poster.jpg --document ./menu.pdf --channel-id 7
+```
+
+See `pintomind posts schema attachments` for the JSON schema.
 
 ### Resources
 
@@ -502,7 +558,7 @@ pintomind resources update <resource-id> --data '{"poster_data": "<json-string>"
 
 ### Media Boxes
 
-Media boxes are reusable visual slots for plain posts. Create boxes first, then pass their IDs to a plain post in `media_box_ids` slot order. The API picks the plain-post grid variation from the number of boxes.
+Media boxes are reusable visual slots for plain posts. Create boxes first, then pass their IDs to a plain post in `media_box_ids` slot order. The API picks the plain-post grid variation from the body content, the number of boxes, and their shape — or use `variation` to pick a named layout yourself.
 
 ```bash
 pintomind media-boxes list

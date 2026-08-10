@@ -26,6 +26,10 @@ pintomind connection show   # show active connection and masked API key
 ## Screens
 
 ```bash
+pintomind screens connect <code>                  # connect a new screen using the code it displays
+pintomind screens connect <code> --channel-id 17  # ...and show a channel immediately
+pintomind screens connect <code> --name "Lobby" --notes "Reception desk"  # ...with name and notes
+pintomind screens update <id> --name "Lobby" --notes "Reception desk"     # rename / set notes (empty --notes clears)
 pintomind screens list
 pintomind screens list --online
 pintomind screens list --offline
@@ -51,7 +55,7 @@ pintomind screens reboot            [id|--ids ...|--all]
 pintomind screens clear-cache       [id|--ids ...|--all]
 pintomind screens upgrade-firmware  [id|--ids ...|--all]
 pintomind screens identify          [id|--ids ...|--all]
-pintomind screens toggle-night-mode [id|--ids ...|--all]
+pintomind screens toggle-night-mode [id|--ids ...|--all]   # --on / --off forces a state instead of toggling
 ```
 
 ### Remote control signals
@@ -98,6 +102,9 @@ pintomind channels list --sort-by name
 pintomind channels list --page 2 --per-page 50
 pintomind channels show <id>
 pintomind channels posts <id>           # account token required
+pintomind channels posts <id> --visible                 # only currently visible publications (--hidden for the inverse)
+pintomind channels posts <id> --sort-by position        # play order (also: area, created_at, updated_at; append :desc; comma-separate)
+pintomind channels posts <id> --fields id,title,position,will_be_visible_at,will_be_hidden_at --json
 pintomind channels stats                # requires channels:read:stats scope
 pintomind channels stats <id>
 pintomind channels set-theme <channel-id> <theme-id>
@@ -171,7 +178,7 @@ Inspect valid fields for resource and post types:
 pintomind schemas list
 pintomind schemas show <id>           # e.g. pintomind schemas show text
 pintomind schemas show post_<alias>   # e.g. pintomind schemas show post_image
-pintomind schemas show grid_templates # named grid layouts for plain post variations
+pintomind schemas show post_plain     # includes x-variation-details: every grid layout for plain posts
 ```
 
 Resource schema keys: `calendar`, `calendar_events`, `entur`, `external_image`, `external_webpage`, `feed`, `feed_items`, `html`, `location`, `qr_code`, `text`, `youtube`, `poster_page`.
@@ -246,6 +253,7 @@ pintomind posts create image --name "X" --image ./photo.jpg --media-collection 1
 # Plain text post
 pintomind posts create plain --name "Welcome" --heading "<p>Hello</p>" --channel-id 7
 pintomind posts create plain --name "Msg" --heading "<p>Hi</p>" --heading-alignment center --heading-fontsize 150 --body "<p>Body</p>" --body-alignment left --body-fontsize 80
+pintomind posts create plain --name "Duo" --heading "<p>Hi</p>" --body "<p>Text</p>" --media 42 --media 43 --variation R13-HTII  # named grid layout (or 'auto'); omit for auto. Layouts: schemas show post_plain
 
 # Feed post — creates a feed resource then the post
 pintomind posts create feed --name "News" --url https://example.com/rss.xml --channel-id 7
@@ -269,7 +277,10 @@ pintomind posts create poster --name "Brand poster" --source-id 42 --color-palet
 All `posts create <type>` helpers accept:
 - `--channel-id N` (repeatable) — publish to one or more channels immediately
 - `--area F11` — channel area for all publications
+- `--position N` — 0-based play-order position within the channel area (0 = first; omit for channel default)
+- `--document <file-or-url>` (repeatable) — upload into the document media collection and attach as a Go document attachment
 - `--full-screen` — publish fullscreen to all channels
+- `--priority <value>` — playback priority: `once_per_round` (default), `twice_per_round`, `between_each_post`, `only_post_in_area`, `only_post_in_channel`, `every_other_round`, `once_per_hour`. Any post schema (`pintomind schemas show post_<alias>`) describes each value's behavior.
 - `--until <YYYY-MM-DD[THH:MM]>` — auto-expire the post at this date/time (attaches a one-period schedule that unpublishes on expiry). Time defaults to `23:59` when omitted.
 
 `--until` is evaluated in each channel's local time zone. For richer schedules (recurring weekly windows, multiple periods, or other expiry actions) use `pintomind posts schedule set` after creating the post.
@@ -313,6 +324,24 @@ Inspect the JSON schema with `pintomind posts schema time-schedule`.
 
 Time zones: weekdays and times are evaluated in the time zone of the channel the post is published to, not in your local zone. A post published to channels in different time zones turns on/off at each channel's local wall-clock time.
 
+### Post attachments (Go mobile app)
+
+Attachments are extra content shown with a post in the branded Go mobile app. Types: `text` (max one per post — edit the existing one instead of adding another), `link` (a tappable button; `link_type`: `link`, `mail`, `sms`, `tel`, `go_channel`; `url` is the email address or phone number for `mail`/`sms`/`tel`), `document` (references media in a document media collection). Schema: `pintomind schemas show post_attachments`.
+
+```bash
+pintomind posts attachments list <post-id>
+pintomind posts attachments add text <post-id> --text "<p>More info</p>" --alignment center
+pintomind posts attachments add link <post-id> --url https://example.com --label "Sign up"
+pintomind posts attachments add link <post-id> --url hi@example.com --link-type mail
+pintomind posts attachments add link <post-id> --url +4712345678 --link-type tel
+pintomind posts attachments add document <post-id> --media 42          # existing document media
+pintomind posts attachments add document <post-id> --file ./menu.pdf   # upload to document collection, then attach
+pintomind posts attachments update <post-id> <attachment-id> --text "<p>Updated</p>"   # pass only fields to change
+pintomind posts attachments delete <post-id> <attachment-id> --force
+```
+
+Shortcut at creation time: every `posts create <type>` helper accepts `--document <file-or-url>` (repeatable) — uploads into the default document media collection and attaches after the post is created.
+
 ### Creating posts — raw JSON (all post types)
 
 `posts create --type <alias> --data '<json>'` accepts any post type. The CLI wraps it in `{"type": ..., "post": {...}}` for you.
@@ -327,7 +356,7 @@ pintomind schemas show post_plain
 pintomind schemas show post_calendar
 ```
 
-Common shared fields: `name`, `title`, `duration`, `show_title`, `area`, `background_id` (a MediaBox id used as post background — create one with `pintomind media-boxes create ...`; pass `null` on update to clear).
+Common shared fields: `name`, `title`, `duration`, `show_title`, `area`, `priority` (playback frequency/takeover policy — enum and per-value behavior in every post schema), `background_id` (a MediaBox id used as post background — create one with `pintomind media-boxes create ...`; pass `null` on update to clear).
 
 Typed `posts create` subcommands also accept `--background-media-box <id>` and the `image` subcommand accepts `--template center|maxpane|fullpane|image_grid`.
 
@@ -399,6 +428,7 @@ pintomind posts publish <post-id> --channel-id 7                    # publish to
 pintomind posts publish <post-id> --channel-id 7 --channel-id 12    # multiple channels in one call
 pintomind posts publish <post-id> --channel-id 7 --area F11         # specific area
 pintomind posts publish <post-id> --channel-id 7 --full-screen      # fullscreen
+pintomind posts publish <post-id> --channel-id 7 --position 0       # 0-based play-order position in the area (omit for channel default)
 pintomind posts unpublish <post-id>                                 # unpublish from ALL channels
 pintomind posts unpublish <post-id> --channel-id 7                  # unpublish from a specific channel
 pintomind posts unpublish <post-id> --channel-id 7 --channel-id 12 --force
@@ -487,7 +517,9 @@ pintomind resources update <resource-id> --data '{"color_palette_id": 5}'
 
 Media boxes are visual containers used by both plain posts and poster posts.
 
-**Plain posts** use `media_box_ids` as an **array** of IDs in slot order. The server writes each box UUID into the selected grid and sets `post_id` on the attached boxes. Max 4 boxes; grid variation selected by count: 0 → `R12-HT`, 1 → `R12-HIT`, 2 → `R121-HIIT`, 3 → `R131-HIIIT`, 4 → `R14-HIIIIT`.
+**Plain posts** use `media_box_ids` as an **array** of IDs in slot order. The server writes each box UUID into the selected grid and sets `post_id` on the attached boxes. Max 4 boxes. The grid variation is selected automatically from body presence and length, media count, and media shape (wide/portrait). Pass `variation` (`--variation` on `posts create plain`) with a named layout to override, or `auto` to re-run the selection; omitting `variation` on update preserves the current layout.
+
+To pick a layout yourself instead of relying on auto, run `pintomind schemas show post_plain`: the `variation` property's `x-variation-details` object describes every layout — media slot count, whether it has a body slot, the composition, what it's best for, and when auto selects it. Choose the entry matching your media count and body needs.
 
 **Poster posts** use `media_box_ids` as a **hash** of `{ "node-position": box_id }` on the backing `PosterPageResource`. The key is the `id` of the target node inside the poster template. Each submission is a full replacement; omitted positions are removed. Pass `{}` to remove all.
 
@@ -519,8 +551,12 @@ pintomind posts create --type plain --data '{
   "media_box_ids":[201,202]
 }'
 
-# Replace attached boxes on an existing plain post
+# Replace attached boxes on an existing plain post (layout preserved when variation is omitted)
 pintomind posts update <post-id> --data '{"media_box_ids":[203]}'
+
+# Force a named layout, or re-run automatic layout selection
+pintomind posts update <post-id> --data '{"variation":"R121-HIIT"}'
+pintomind posts update <post-id> --data '{"variation":"auto"}'
 
 # Attach boxes to a poster post (hash of node-position → id, via poster_page resource)
 pintomind resources update <resource-id> --data '{"media_box_ids": {"hero-image": 201, "avatar": 202}}'

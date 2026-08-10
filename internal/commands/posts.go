@@ -26,6 +26,7 @@ type Publication struct {
 	ID         int    `json:"id"`
 	ChannelID  int    `json:"channel_id"`
 	Area       string `json:"area"`
+	Position   *int   `json:"position"`
 	FullScreen bool   `json:"full_screen"`
 	Visible    bool   `json:"visible"`
 }
@@ -59,7 +60,9 @@ func NewPostsCmd() *cobra.Command {
 	cmd.AddCommand(newPostsUnpublishCmd())
 	cmd.AddCommand(newPostsScheduleCmd())
 	cmd.AddCommand(newPostsNotificationsCmd())
+	cmd.AddCommand(newPostsAttachmentsCmd())
 	cmd.AddCommand(newSchemaSubCmd(map[string]string{
+		"attachments": "post_attachments",
 		"calendar":    "post_calendar",
 		"clock":       "post_clock",
 		"counter":     "post_counter",
@@ -284,15 +287,20 @@ func newPostsPublicationsCmd() *cobra.Command {
 			fmt.Printf("Total: %d\n\n", resp.Total)
 			rows := make([][]string, len(resp.Items))
 			for i, p := range resp.Items {
+				pos := ""
+				if p.Position != nil {
+					pos = strconv.Itoa(*p.Position)
+				}
 				rows[i] = []string{
 					strconv.Itoa(p.ID),
 					strconv.Itoa(p.ChannelID),
 					p.Area,
+					pos,
 					strconv.FormatBool(p.FullScreen),
 					strconv.FormatBool(p.Visible),
 				}
 			}
-			printTable(cmd, []string{"ID", "CHANNEL_ID", "AREA", "FULLSCREEN", "VISIBLE"}, rows)
+			printTable(cmd, []string{"ID", "CHANNEL_ID", "AREA", "POSITION", "FULLSCREEN", "VISIBLE"}, rows)
 			return nil
 		},
 	}
@@ -302,6 +310,7 @@ func newPostsPublishCmd() *cobra.Command {
 	var channelIDs []int
 	var area string
 	var fullScreen bool
+	var position int
 
 	cmd := &cobra.Command{
 		Use:   "publish <post-id> --channel-id N [--channel-id N ...]",
@@ -309,7 +318,8 @@ func newPostsPublishCmd() *cobra.Command {
 		Example: `  pintomind posts publish 123 --channel-id 7
   pintomind posts publish 123 --channel-id 7 --channel-id 12
   pintomind posts publish 123 --channel-id 7 --area F11
-  pintomind posts publish 123 --channel-id 7 --full-screen`,
+  pintomind posts publish 123 --channel-id 7 --full-screen
+  pintomind posts publish 123 --channel-id 7 --position 0   # first in the area's play order`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
@@ -323,6 +333,9 @@ func newPostsPublishCmd() *cobra.Command {
 			if fullScreen {
 				publication["full_screen"] = true
 			}
+			if position >= 0 {
+				publication["position"] = position
+			}
 			body := map[string]any{"publication": publication}
 			var resp map[string]any
 			if err := a.Client.Post("/posts/"+args[0]+"/publications", body, &resp); err != nil {
@@ -335,6 +348,7 @@ func newPostsPublishCmd() *cobra.Command {
 	cmd.Flags().IntSliceVar(&channelIDs, "channel-id", nil, "Channel ID to publish to (repeatable; required)")
 	cmd.Flags().StringVar(&area, "area", "", "Channel area for all channels (defaults to the post's area; pass F11 for fullscreen)")
 	cmd.Flags().BoolVar(&fullScreen, "full-screen", false, "Publish as fullscreen to all channels (alternative to --area F11)")
+	cmd.Flags().IntVar(&position, "position", -1, "0-based play-order position within the channel area (0 = first; omit for channel default)")
 	_ = cmd.MarkFlagRequired("channel-id")
 	return cmd
 }
