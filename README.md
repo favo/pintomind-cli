@@ -617,6 +617,21 @@ pintomind themes list
 pintomind themes list --page 2
 pintomind themes show <id>
 pintomind themes stats
+pintomind themes create --data '{"name":"Brand","font_family_header_id":1,"font_family_body_id":2,"background_color":"#1a1a2e","text_color":"#ffffff"}'
+pintomind themes update <id> --data '{"color_palette_id":5}'
+pintomind themes delete <id>
+```
+
+Background image and logo are media boxes. `set-background` and `set-logo` create the box and attach it in one step:
+
+```bash
+pintomind themes set-background <id> --file ./background.jpg   # uploads, wraps, attaches
+pintomind themes set-logo <id> --file ./logo.png
+pintomind themes set-background <id> --media-id 42 --background-size cover
+pintomind themes set-background <id> --unsplash-photo-id abc123
+pintomind themes set-background <id> --media-box 4711   # attach an existing box
+pintomind themes set-logo <id> --media-id 77
+pintomind themes set-logo <id> --clear
 ```
 
 ### Color Palettes
@@ -749,7 +764,7 @@ For Claude Code:
 pintomind setup claude
 ```
 
-This writes `~/.claude/skills/pintomind/SKILL.md`, making `/pintomind` available as a slash command in any Claude Code session. Use `--force` to overwrite an existing installation.
+This writes `~/.claude/skills/pintomind/SKILL.md`, making `/pintomind` available as a slash command in any Claude Code session. Re-running the command overwrites an existing installation.
 
 For Codex and ChatGPT/OpenAI-compatible agents:
 

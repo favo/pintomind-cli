@@ -515,7 +515,17 @@ pintomind resources update <resource-id> --data '{"color_palette_id": 5}'
 
 ### Media Boxes
 
-Media boxes are visual containers used by both plain posts and poster posts.
+Media boxes are visual containers used by posts, poster pages, and themes. A box is always created on its own first (`pintomind media-boxes create ...`), then attached where it should show up:
+
+| Target | Field | Shape |
+|---|---|---|
+| Plain post media slots | `post.media_box_ids` | array of ids, slot order |
+| Poster post | `resource.media_box_ids` | hash of node position → id |
+| Any post background | `post.background_id` | single id |
+| Theme background image | `theme.background_media_id` | single id |
+| Theme logo | `theme.logo_id` | single id |
+
+Every single-id field takes `null` to detach. Attaching a box owned by another account returns `404`.
 
 **Plain posts** use `media_box_ids` as an **array** of IDs in slot order. The server writes each box UUID into the selected grid and sets `post_id` on the attached boxes. Max 4 boxes. The grid variation is selected automatically from body presence and length, media count, and media shape (wide/portrait). Pass `variation` (`--variation` on `posts create plain`) with a named layout to override, or `auto` to re-run the selection; omitting `variation` on update preserves the current layout.
 
@@ -605,8 +615,48 @@ pintomind themes delete <id> --force
 ```
 
 Required fields for `create`: `name`, `font_family_header_id`, `font_family_body_id`, `background_color`, `text_color`.
-Optional: `color_palette_id`, `variation`, `areas`, and any flat layout/background/text properties.
+Optional: `color_palette_id`, `variation`, `areas`, `background_media_id`, `logo_id`, and any flat layout/background/text properties.
 Deleting a theme resets channels using it to the account's standard theme.
+
+### Theme background image and logo
+
+Both are media boxes attached by id (`background_media_id`, `logo_id`). Use the `set-background` / `set-logo` helpers — they create the box and attach it in one step:
+
+```bash
+# From a local file or URL: uploads to the default background/logo media collection,
+# wraps it in a media box, attaches it. Override the collection with --media-collection.
+pintomind themes set-background <theme-id> --file ./background.jpg
+pintomind themes set-background <theme-id> --file https://example.com/bg.jpg --background-size cover
+pintomind themes set-logo <theme-id> --file ./logo.png
+
+# From the media library (creates a `media` box, then attaches it)
+pintomind themes set-background <theme-id> --media-id 42
+pintomind themes set-background <theme-id> --media-id 42 --background-size cover --x 0.4 --y 0.5
+pintomind themes set-logo <theme-id> --media-id 77
+
+# From Unsplash or Giphy
+pintomind themes set-background <theme-id> --unsplash-photo-id abc123 --background-size cover
+pintomind themes set-background <theme-id> --gif-id xT9IgG50Fb7Mi0only
+
+# Attach a box that already exists
+pintomind themes set-background <theme-id> --media-box 4711
+
+# Remove
+pintomind themes set-background <theme-id> --clear
+pintomind themes set-logo <theme-id> --clear
+```
+
+Exactly one of `--file`, `--media-box`, `--media-id`, `--unsplash-photo-id`, `--gif-id`, `--clear` per call. Add `--json` to get the full theme response instead of the summary lines. `--file` accepts the same inputs as `media upload` (local path or URL) and waits for the upload task to finish.
+
+The raw fields also work through `themes create` / `themes update` when you want to set them alongside other attributes:
+
+```bash
+pintomind themes update <theme-id> --data '{"background_media_id":4711,"logo_id":4712}'
+pintomind themes update <theme-id> --data '{"background_media_id":null}'
+pintomind themes create --data '{"name":"Brand","font_family_header_id":1,"font_family_body_id":2,"background_color":"#1a1a2e","text_color":"#ffffff","background_media_id":4711}'
+```
+
+`media`, `unsplash`, and `gif` boxes make sense as a background; a logo is normally a `media` box. `themes list` and `themes show` return `background_media_id` and `logo_id` (`null` when unset). A box belonging to another account gives `404`. Replacing a box leaves the previous one in the account — delete it with `pintomind media-boxes delete <id>` if it is no longer used.
 
 ## Color Palettes
 
