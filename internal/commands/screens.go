@@ -128,6 +128,7 @@ func NewScreensCmd() *cobra.Command {
 		newScreensWaitOnlineCmd(),
 		newScreensSetChannelCmd(),
 		newScreensTempChannelCmd(),
+		newScreensDebugCmd(),
 	)
 
 	// Device + playback actions

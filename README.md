@@ -235,6 +235,32 @@ pintomind screens temp-channel --all <channel-id> --duration 1800
 pintomind screens temp-channel <screen-id> <channel-id> --toggle
 ```
 
+**Debug a screen:**
+
+Runs remote console commands on a screen. Needs an API key with the `screens:debug` scope (not ticked by default
+on new keys) and a screen that is online with butler 0.17.0 or newer; reload the screen to update it. Elements can be
+given as a CSS selector or as a path such as `@1/1/2`, which `dom` and `elements` print. Every command supports `--json`.
+
+```bash
+pintomind screens debug status <screen-id>                     # what each area shows, seconds left
+pintomind screens debug posts <screen-id>                      # every post and whether it is ready, scheduled or hidden
+pintomind screens debug post <screen-id> <post-id>             # the post's data as the screen has it
+pintomind screens debug logs <screen-id> --level error -f      # recent log lines, keep following
+pintomind screens debug network <screen-id> --sort size --desc # requests with service worker and browser cache status
+pintomind screens debug network <screen-id> --errors --category image
+pintomind screens debug elements <screen-id> .post.visible     # size, position, visibility
+pintomind screens debug elements <screen-id> @1/1/2 --full     # all computed styles and the box model (JSON)
+pintomind screens debug dom <screen-id> @1/1                   # walk the element tree
+pintomind screens debug health <screen-id> --fps               # memory, connection, frames per second
+pintomind screens debug eval <screen-id> 'document.title'      # run JavaScript in the screen view
+pintomind screens debug eval <screen-id> --path @1/1/2 'return $0.children.length'
+cat probe.js | pintomind screens debug eval <screen-id> -
+pintomind screens debug loop <screen-id> pause                 # status, pause, resume, toggle, next, previous, next-part, previous-part
+pintomind screens debug show-post <screen-id> <post-id>        # jump to a post
+pintomind screens debug hide-post <screen-id> <post-id>        # hide until the screen reloads (unhide-post shows it again)
+pintomind screens debug highlight <screen-id> .post.visible    # outline elements on the physical screen
+```
+
 ### Channels
 
 ```bash
