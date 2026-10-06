@@ -94,6 +94,48 @@ pintomind screens temp-channel --all <channel-id> --duration 1800
 pintomind screens temp-channel <screen-id> <channel-id> --toggle
 ```
 
+### Remote debugging
+
+`screens debug` runs remote console commands on a single screen. It needs an API key with the
+`screens:debug` scope, and the screen must be online and run butler 0.17.0 or newer (reload the
+screen to update it). Elements are given as a CSS selector or as a path such as `@1/0/2`, which
+`dom` and `elements` print. Add `--json` for the screen's raw answer.
+
+```bash
+# What is playing
+pintomind screens debug status <screen-id>          # butler version, loop state, current post per area
+pintomind screens debug posts <screen-id>           # every post in every area: ready, scheduled, hidden, remaining
+pintomind screens debug post <screen-id> <post-id>  # the data the screen has for a post
+
+# Playback
+pintomind screens debug loop <screen-id> [status|pause|resume|toggle|next|previous|next-part|previous-part]
+pintomind screens debug show-post <screen-id> <post-id>    # jump to a post
+pintomind screens debug hide-post <screen-id> <post-id>    # hide until the screen reloads
+pintomind screens debug unhide-post <screen-id> <post-id>
+
+# Health, logs and network
+pintomind screens debug health <screen-id> [--fps]  # memory, connection; --fps measures for ~2s
+pintomind screens debug logs <screen-id> [--limit 100] [--level error|warn|info|log]
+pintomind screens debug logs <screen-id> -f [--interval 3s]  # follow; with --json streams one entry per line
+pintomind screens debug network <screen-id> [--errors] [--category data|script|style|image|media|font|other] \
+  [--query text] [--sort started|size|time|name|status] [--desc] [--limit 500]
+
+# DOM inspection
+pintomind screens debug dom <screen-id> [selector|@path]       # an element and its children, to walk the tree
+pintomind screens debug elements <screen-id> <selector|@path>  # size, position, visibility of matches
+pintomind screens debug elements <screen-id> <selector|@path> --full  # computed styles, box model, attributes (JSON)
+pintomind screens debug highlight <screen-id> <selector|@path> # outline on the physical screen for 5 seconds
+
+# Run JavaScript in the screen view
+pintomind screens debug eval <screen-id> 'document.title'
+pintomind screens debug eval <screen-id> --path @1/1/2 '$0.getBoundingClientRect()'  # $0 = element at path
+pintomind screens debug eval <screen-id> --file snippet.js
+echo 'return App.loop.isRunning' | pintomind screens debug eval <screen-id> -
+```
+
+Typical flow for "why is this post not showing": `status` → `posts` (check ready/scheduled/hidden)
+→ `post <id>` → `logs --level error` → `network --errors`.
+
 ## Channels
 
 ```bash
