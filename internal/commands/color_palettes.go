@@ -17,8 +17,9 @@ type ColorPalette struct {
 }
 
 type ColorPalettesResponse struct {
-	Total int            `json:"total"`
-	Items []ColorPalette `json:"items"`
+	Total      int            `json:"total"`
+	Pagination *Pagination    `json:"pagination,omitempty"`
+	Items      []ColorPalette `json:"items"`
 }
 
 func NewColorPalettesCmd() *cobra.Command {
@@ -61,7 +62,7 @@ func newColorPalettesListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, p := range resp.Items {
 				rows[i] = []string{strconv.Itoa(p.ID), p.Name, p.PrimaryColor, p.SecondaryColor, p.TertiaryColor}
@@ -70,8 +71,8 @@ func newColorPalettesListCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name:asc)")
-	addPaginationFlags(cmd)
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: name, created_at, updated_at (e.g. name, updated_at:desc)")
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 
@@ -112,8 +113,8 @@ func newColorPalettesCreateCmd() *cobra.Command {
 	var name, primaryColor, secondaryColor, tertiaryColor string
 
 	cmd := &cobra.Command{
-		Use:   "create --name <name> --primary-color <hex>",
-		Short: "Create a color palette",
+		Use:     "create --name <name> --primary-color <hex>",
+		Short:   "Create a color palette",
 		Example: `  pintomind color-palettes create --name "Brand" --primary-color "#1F8A8A" --secondary-color "#F5A623"`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)

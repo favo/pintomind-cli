@@ -15,7 +15,10 @@ func NewAPICmd() *cobra.Command {
 		Long: `Make a raw request to the Pintomind API. METHOD defaults to GET.
 The path should start with / and is relative to /api/v1.
 
-Pass a JSON body via stdin for POST/PATCH requests.`,
+Pass a JSON body via stdin for POST/PATCH requests.
+
+The response body is always printed; the command exits non-zero when the
+server answers with an HTTP status of 400 or above.`,
 		Example: `  pintomind api /screens
   pintomind api /screens/42
   pintomind api GET /channels?sort_by=name
@@ -51,6 +54,9 @@ Pass a JSON body via stdin for POST/PATCH requests.`,
 			os.Stdout.Write(data)
 			if len(data) > 0 && data[len(data)-1] != '\n' {
 				fmt.Println()
+			}
+			if status >= 400 {
+				return fmt.Errorf("HTTP %d", status)
 			}
 			return nil
 		},

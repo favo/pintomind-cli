@@ -22,8 +22,9 @@ type PostAttachment struct {
 }
 
 type PostAttachmentsResponse struct {
-	Total int              `json:"total"`
-	Items []PostAttachment `json:"items"`
+	Total      int              `json:"total"`
+	Pagination *Pagination      `json:"pagination,omitempty"`
+	Items      []PostAttachment `json:"items"`
 }
 
 var linkTypes = []string{"link", "mail", "sms", "tel", "go_channel"}
@@ -67,7 +68,7 @@ func newPostsAttachmentsListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, at := range resp.Items {
 				content := ""

@@ -1,16 +1,21 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"favo/pintomind-cli/internal/api"
 )
 
 // schemaIDRe extracts schema IDs from the HTML links the /schemas endpoint returns,
-// e.g. <a href='/api/v1/schemas/calendar_events'>calendar_events</a>
+// e.g. <a href='/api/v1/schemas/calendar_events'>calendar_events</a>.
+// Only used as a fallback for servers without GET /schemas.json.
 var schemaIDRe = regexp.MustCompile(`href='[^']+/schemas/([^']+)'`)
 
 func NewSchemasCmd() *cobra.Command {
@@ -29,22 +34,65 @@ func newSchemasListCmd() *cobra.Command {
 		Short: "List available schema keys",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
-			// The /schemas endpoint returns HTML, not JSON.
-			body, _, err := a.Client.DoRaw("GET", "/schemas", nil)
+			ids, err := fetchSchemaIDs(a.Client)
 			if err != nil {
 				return err
 			}
-			matches := schemaIDRe.FindAllSubmatch(body, -1)
-			if len(matches) == 0 {
+			if a.JSONOutput {
+				printJSON(ids)
+				return nil
+			}
+			if len(ids) == 0 {
 				fmt.Println("No schemas found.")
 				return nil
 			}
-			for _, m := range matches {
-				fmt.Println(string(m[1]))
+			for _, id := range ids {
+				fmt.Println(id)
 			}
 			return nil
 		},
 	}
+}
+
+// fetchSchemaIDs lists schema IDs from GET /schemas.json. Older servers only
+// serve an HTML index at /schemas, so a 404 falls back to scraping its links.
+func fetchSchemaIDs(client *api.Client) ([]string, error) {
+	body, status, err := client.DoRaw("GET", "/schemas.json", nil)
+	if err != nil {
+		return nil, err
+	}
+	if status == http.StatusOK {
+		var resp struct {
+			Items []struct {
+				ID string `json:"id"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("decoding response: %w", err)
+		}
+		ids := make([]string, len(resp.Items))
+		for i, item := range resp.Items {
+			ids[i] = item.ID
+		}
+		return ids, nil
+	}
+	if status != http.StatusNotFound {
+		return nil, api.ResponseError(status, body)
+	}
+
+	body, status, err = client.DoRaw("GET", "/schemas", nil)
+	if err != nil {
+		return nil, err
+	}
+	if status >= 400 {
+		return nil, api.ResponseError(status, body)
+	}
+	matches := schemaIDRe.FindAllSubmatch(body, -1)
+	ids := make([]string, len(matches))
+	for i, m := range matches {
+		ids[i] = string(m[1])
+	}
+	return ids, nil
 }
 
 // newSchemaSubCmd returns a "schema [type]" subcommand for a command group.
@@ -78,7 +126,11 @@ func newSchemaSubCmd(keys map[string]string) *cobra.Command {
 					return nil
 				}
 			} else {
+				// Accept both "poster-page" and "poster_page".
 				key, ok := keys[args[0]]
+				if !ok {
+					key, ok = keys[strings.ReplaceAll(args[0], "_", "-")]
+				}
 				if !ok {
 					return fmt.Errorf("unknown type %q — valid types: %s", args[0], strings.Join(sorted, ", "))
 				}

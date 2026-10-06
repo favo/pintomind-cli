@@ -84,10 +84,7 @@ func (c *Client) do(method, path string, body any, out any) error {
 	}
 
 	if resp.StatusCode >= 400 {
-		if message := apiErrorMessage(resp.StatusCode, data); message != "" {
-			return fmt.Errorf("API error %d: %s", resp.StatusCode, message)
-		}
-		return fmt.Errorf("API error %d", resp.StatusCode)
+		return ResponseError(resp.StatusCode, data)
 	}
 
 	if out != nil {
@@ -231,10 +228,7 @@ func (c *Client) doMultipart(method, path string, fields map[string]string, file
 		return err
 	}
 	if resp.StatusCode >= 400 {
-		if message := apiErrorMessage(resp.StatusCode, data); message != "" {
-			return fmt.Errorf("API error %d: %s", resp.StatusCode, message)
-		}
-		return fmt.Errorf("API error %d", resp.StatusCode)
+		return ResponseError(resp.StatusCode, data)
 	}
 	if out != nil {
 		if err := json.Unmarshal(data, out); err != nil {
@@ -242,6 +236,15 @@ func (c *Client) doMultipart(method, path string, fields map[string]string, file
 		}
 	}
 	return nil
+}
+
+// ResponseError builds the error returned for an HTTP status >= 400, including
+// whatever details the JSON error body carries.
+func ResponseError(statusCode int, data []byte) error {
+	if message := apiErrorMessage(statusCode, data); message != "" {
+		return fmt.Errorf("API error %d: %s", statusCode, message)
+	}
+	return fmt.Errorf("API error %d", statusCode)
 }
 
 func apiErrorMessage(statusCode int, data []byte) string {
@@ -274,18 +277,78 @@ func errorMessageFromPayload(payload any) string {
 	case []any:
 		return joinErrorMessages(value)
 	case map[string]any:
-		for _, key := range []string{"error", "message", "errors", "detail", "details"} {
-			if raw, ok := value[key]; ok {
-				if key == "errors" {
-					return validationErrorsMessage(raw)
+		var parts []string
+		add := func(message string) {
+			if message == "" {
+				return
+			}
+			for _, existing := range parts {
+				if existing == message {
+					return
 				}
+			}
+			parts = append(parts, message)
+		}
+		for _, key := range []string{"error", "message", "detail", "details"} {
+			if raw, ok := value[key]; ok {
 				if message := errorMessageFromPayload(raw); message != "" {
-					return message
+					add(message)
+					break
 				}
 			}
 		}
+		if raw, ok := value["errors"]; ok {
+			add(validationErrorsMessage(raw))
+		}
+		if raw, ok := value["unpermitted_params"]; ok {
+			if params := formatParams(raw); params != "" {
+				add("unpermitted params: " + params)
+			}
+		}
+		if raw, ok := value["permitted_params"]; ok {
+			if params := formatParams(raw); params != "" {
+				add("permitted params: " + params)
+			}
+		}
+		return strings.Join(parts, "; ")
 	}
 	return ""
+}
+
+// formatParams renders a Rails-style permitted/unpermitted params structure
+// (strings, arrays and nested objects) compactly, e.g. "media[name, description]".
+func formatParams(payload any) string {
+	switch value := payload.(type) {
+	case nil:
+		return ""
+	case string:
+		return value
+	case []any:
+		items := make([]string, 0, len(value))
+		for _, item := range value {
+			if s := formatParams(item); s != "" {
+				items = append(items, s)
+			}
+		}
+		return strings.Join(items, ", ")
+	case map[string]any:
+		keys := make([]string, 0, len(value))
+		for key := range value {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		items := make([]string, 0, len(keys))
+		for _, key := range keys {
+			if inner := formatParams(value[key]); inner != "" {
+				items = append(items, key+"["+inner+"]")
+			} else {
+				items = append(items, key)
+			}
+		}
+		return strings.Join(items, ", ")
+	default:
+		return fmt.Sprint(value)
+	}
 }
 
 func validationErrorsMessage(payload any) string {

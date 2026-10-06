@@ -76,8 +76,8 @@ func newResourcesListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&resourceType, "type", "", "Filter by resource type alias (comma-separated for multiple)")
-	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name:asc)")
-	addPaginationFlags(cmd)
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: title, type, created_at, updated_at (e.g. title, updated_at:desc)")
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 
@@ -124,16 +124,16 @@ func newResourcesCreateCmd() *cobra.Command {
 		Long: `Create a resource.
 
 Pick the subcommand for the resource type you want — each one has friendly
-flags (--label, --url, --text, etc.) tailored to that type:
+flags (--title, --label, --url, --text, etc.) tailored to that type:
 
   pintomind resources create text --label "Hello" --text "World"
-  pintomind resources create feed --url https://example.com/feed.xml --label "News"
-  pintomind resources create calendar --url https://example.com/cal.ics --label "Events"
-  pintomind resources create qr-code --url https://example.com --label "Site"
+  pintomind resources create feed --url https://example.com/feed.xml --title "News"
+  pintomind resources create calendar --url https://example.com/cal.ics --title "Events"
+  pintomind resources create qr-code --url https://example.com --title "Site"
 
 Advanced: pass raw API JSON with --type and --data (skips validation helpers).`,
 		Example: `  pintomind resources create text --label "Hello" --text "World"
-  pintomind resources create feed --url https://example.com/feed.xml --label "News"
+  pintomind resources create feed --url https://example.com/feed.xml --title "News"
 
   # Advanced (raw JSON):
   pintomind resources create --type text --data '{"label":"Hello","text":"World"}'`,
@@ -253,10 +253,26 @@ func newResourcesDeleteCmd() *cobra.Command {
 					return nil
 				}
 			}
-			if err := a.Client.Delete("/resources/" + args[0]); err != nil {
+			var resp map[string]any
+			if err := a.Client.DeleteWithBody("/resources/"+args[0], nil, &resp); err != nil {
 				return err
 			}
-			fmt.Printf("Deleted resource %s\n", args[0])
+			if a.JSONOutput {
+				printJSON(resp)
+				return nil
+			}
+			message, _ := resp["message"].(string)
+			if success, ok := resp["success"].(bool); ok && !success {
+				if message == "" {
+					message = "delete failed"
+				}
+				return fmt.Errorf("resource %s: %s", args[0], message)
+			}
+			if message != "" {
+				fmt.Printf("Resource %s: %s\n", args[0], message)
+			} else {
+				fmt.Printf("Deleted resource %s\n", args[0])
+			}
 			return nil
 		},
 	}

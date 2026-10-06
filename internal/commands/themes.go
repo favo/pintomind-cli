@@ -17,8 +17,9 @@ type Theme struct {
 }
 
 type ThemesResponse struct {
-	Total int     `json:"total"`
-	Items []Theme `json:"items"`
+	Total      int         `json:"total"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+	Items      []Theme     `json:"items"`
 }
 
 func NewThemesCmd() *cobra.Command {
@@ -62,7 +63,7 @@ func newThemesListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, t := range resp.Items {
 				rows[i] = []string{strconv.Itoa(t.ID), t.Name}
@@ -71,8 +72,8 @@ func newThemesListCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name:asc)")
-	addPaginationFlags(cmd)
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: name, created_at, updated_at (e.g. name, updated_at:desc)")
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 
@@ -274,7 +275,7 @@ something that already exists. --media-box attaches a box you built yourself.`,
 	cmd.Flags().IntVar(&mediaID, "media-id", 0, "Create a media box from this media library item and attach it")
 	cmd.Flags().StringVar(&photoID, "unsplash-photo-id", "", "Create an Unsplash media box from this photo id and attach it")
 	cmd.Flags().StringVar(&gifID, "gif-id", "", "Create a Giphy media box from this gif id and attach it")
-	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size for a created box: cover, contain, auto")
+	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size for a created box: cover, contain")
 	cmd.Flags().Float64Var(&x, "x", 0, "Horizontal focal point for a created box (0.0–1.0)")
 	cmd.Flags().Float64Var(&y, "y", 0, "Vertical focal point for a created box (0.0–1.0)")
 	cmd.Flags().BoolVar(&clear, "clear", false, "Remove the current "+slot)

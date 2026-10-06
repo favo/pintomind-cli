@@ -17,8 +17,9 @@ type Channel struct {
 }
 
 type ChannelsResponse struct {
-	Total int       `json:"total"`
-	Items []Channel `json:"items"`
+	Total      int         `json:"total"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+	Items      []Channel   `json:"items"`
 }
 
 func NewChannelsCmd() *cobra.Command {
@@ -62,7 +63,7 @@ func newChannelsListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, c := range resp.Items {
 				rows[i] = []string{
@@ -73,13 +74,17 @@ func newChannelsListCmd() *cobra.Command {
 					strconv.Itoa(c.OfflineScreens),
 				}
 			}
-			printTable(cmd, []string{"ID", "NAME", "TYPE", "ONLINE", "OFFLINE"}, rows)
+			headers, rows := selectColumns(fields,
+				[]string{"ID", "NAME", "TYPE", "ONLINE", "OFFLINE"},
+				[][]string{{"id"}, {"name"}, {"type"}, {"online_screens"}, {"offline_screens"}},
+				rows)
+			printTable(cmd, headers, rows)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&fields, "fields", "", "Comma-separated fields to include")
-	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name, name:desc)")
-	addPaginationFlags(cmd)
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: name, created_at, updated_at (e.g. name, name:desc)")
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 
@@ -111,8 +116,9 @@ type ChannelPost struct {
 }
 
 type ChannelPostsResponse struct {
-	Total int           `json:"total"`
-	Items []ChannelPost `json:"items"`
+	Total      int           `json:"total"`
+	Pagination *Pagination   `json:"pagination,omitempty"`
+	Items      []ChannelPost `json:"items"`
 }
 
 func newChannelsPostsCmd() *cobra.Command {
@@ -161,7 +167,7 @@ func newChannelsPostsCmd() *cobra.Command {
 			if err := a.Client.Get("/channels/"+args[0]+"/posts", q, &resp); err != nil {
 				return err
 			}
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, p := range resp.Items {
 				pos := ""
@@ -182,7 +188,11 @@ func newChannelsPostsCmd() *cobra.Command {
 					vis,
 				}
 			}
-			printTable(cmd, []string{"ID", "TYPE", "TITLE", "AREA", "POSITION", "PRIORITY", "VISIBLE"}, rows)
+			headers, rows := selectColumns(fields,
+				[]string{"ID", "TYPE", "TITLE", "AREA", "POSITION", "PRIORITY", "VISIBLE"},
+				[][]string{{"id"}, {"type"}, {"title"}, {"area"}, {"position"}, {"priority"}, {"visible"}},
+				rows)
+			printTable(cmd, headers, rows)
 			return nil
 		},
 	}
@@ -190,7 +200,7 @@ func newChannelsPostsCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&hidden, "hidden", false, "Only publications that are currently hidden")
 	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: area, position, created_at, updated_at (append :desc to reverse; comma-separate for multiple)")
 	cmd.Flags().StringVar(&fields, "fields", "", "Comma-separated fields to include (e.g. id,title,position,will_be_visible_at)")
-	addPaginationFlags(cmd)
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 

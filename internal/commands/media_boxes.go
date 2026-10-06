@@ -19,8 +19,9 @@ type MediaBox struct {
 }
 
 type MediaBoxesResponse struct {
-	Total int        `json:"total"`
-	Items []MediaBox `json:"items"`
+	Total      int         `json:"total"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+	Items      []MediaBox  `json:"items"`
 }
 
 func NewMediaBoxesCmd() *cobra.Command {
@@ -80,7 +81,7 @@ func newMediaBoxesListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, mb := range resp.Items {
 				postID := ""
@@ -102,7 +103,7 @@ func newMediaBoxesListCmd() *cobra.Command {
 	cmd.Flags().StringVar(&boxType, "type", "", "Filter by media box type alias (comma-separated)")
 	cmd.Flags().StringVar(&postID, "post-id", "", "Filter by owning post ID")
 	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (created_at or updated_at, e.g. created_at:desc)")
-	addPaginationFlags(cmd)
+	addPaginationFlags(cmd, 50)
 	return cmd
 }
 
@@ -219,7 +220,7 @@ func newMediaBoxesCreateMediaCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&mediaID, "media-id", 0, "Media item ID (required)")
-	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size: cover, contain, auto")
+	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size: cover, contain")
 	cmd.Flags().StringVar(&backgroundFillType, "background-fill-type", "", "Background fill type")
 	cmd.Flags().Float64Var(&x, "x", 0, "Horizontal focal point (0.0–1.0)")
 	cmd.Flags().Float64Var(&y, "y", 0, "Vertical focal point (0.0–1.0)")
@@ -233,13 +234,16 @@ func newMediaBoxesCreateIconCmd() *cobra.Command {
 	var relativeSize float64
 
 	cmd := &cobra.Command{
-		Use:   "icon --icon-name <name> --icon-type <type>",
+		Use:   "icon --icon-name <name> [--icon-type <type>]",
 		Short: "Create a media box from an icon",
 		Example: `  pintomind media-boxes create icon --icon-name rocket-launch --icon-type regular
-  pintomind media-boxes create icon --icon-name rocket-launch --icon-type solid --relative-size 0.8`,
+  pintomind media-boxes create icon --icon-name rocket-launch --icon-type duotone --relative-size 0.8`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
-			data := map[string]any{"icon_name": iconName, "icon_type": iconType}
+			data := map[string]any{"icon_name": iconName}
+			if iconType != "" {
+				data["icon_type"] = iconType
+			}
 			if cmd.Flags().Changed("relative-size") {
 				data["relative_size"] = relativeSize
 			}
@@ -247,10 +251,9 @@ func newMediaBoxesCreateIconCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&iconName, "icon-name", "", "Icon name (required)")
-	cmd.Flags().StringVar(&iconType, "icon-type", "", "Icon type, e.g. regular or solid (required)")
+	cmd.Flags().StringVar(&iconType, "icon-type", "", "Icon type: regular, thin, light, bold, fill, duotone (default regular)")
 	cmd.Flags().Float64Var(&relativeSize, "relative-size", 0, "Relative size (0.0–1.0)")
 	_ = cmd.MarkFlagRequired("icon-name")
-	_ = cmd.MarkFlagRequired("icon-type")
 	return cmd
 }
 
@@ -309,7 +312,7 @@ func newMediaBoxesCreateGifCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&gifID, "gif-id", "", "Giphy GIF ID (required)")
-	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size: cover, contain, auto")
+	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size: cover, contain")
 	cmd.Flags().StringVar(&backgroundFillType, "background-fill-type", "", "Background fill type")
 	cmd.Flags().Float64Var(&x, "x", 0, "Horizontal focal point (0.0–1.0)")
 	cmd.Flags().Float64Var(&y, "y", 0, "Vertical focal point (0.0–1.0)")
@@ -349,7 +352,7 @@ func newMediaBoxesCreateUnsplashCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&photoID, "photo-id", "", "Unsplash photo ID (required)")
-	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size: cover, contain, auto")
+	cmd.Flags().StringVar(&backgroundSize, "background-size", "", "Background size: cover, contain")
 	cmd.Flags().StringVar(&backgroundFillType, "background-fill-type", "", "Background fill type")
 	cmd.Flags().Float64Var(&x, "x", 0, "Horizontal focal point (0.0–1.0)")
 	cmd.Flags().Float64Var(&y, "y", 0, "Vertical focal point (0.0–1.0)")

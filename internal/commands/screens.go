@@ -89,8 +89,9 @@ func humanDuration(d time.Duration) string {
 }
 
 type ScreensResponse struct {
-	Total int      `json:"total"`
-	Items []Screen `json:"items"`
+	Total      int         `json:"total"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+	Items      []Screen    `json:"items"`
 }
 
 func NewScreensCmd() *cobra.Command {
@@ -287,14 +288,14 @@ func newScreensListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			printTable(cmd, screenTableHeaders, screenTableRows(resp.Items))
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&online, "online", false, "Show only online screens")
 	cmd.Flags().BoolVar(&offline, "offline", false, "Show only offline screens")
-	addPaginationFlags(cmd)
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 
@@ -479,6 +480,7 @@ func newScreensTempChannelCmd() *cobra.Command {
 	var duration int
 	var until string
 	var toggle bool
+	var off bool
 
 	cmd := &cobra.Command{
 		Use:   "temp-channel [screen-id] <channel-id>",
@@ -486,10 +488,30 @@ func newScreensTempChannelCmd() *cobra.Command {
 		Example: `  pintomind screens temp-channel 42 7 --duration 3600
   pintomind screens temp-channel 42 7 --until 2025-12-31T23:59:00Z
   pintomind screens temp-channel --all 7 --duration 1800
-  pintomind screens temp-channel 42 7 --toggle`,
+  pintomind screens temp-channel 42 7 --toggle
+  pintomind screens temp-channel 42 --off`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ids, _ := cmd.Flags().GetString("ids")
 			all, _ := cmd.Flags().GetBool("all")
+
+			if off {
+				if toggle || duration != 0 || until != "" {
+					return fmt.Errorf("--off cannot be combined with --toggle, --duration or --until")
+				}
+				singleScreenID := ""
+				if ids == "" && !all {
+					if len(args) != 1 {
+						return fmt.Errorf("expected <screen-id> with --off")
+					}
+					singleScreenID = args[0]
+				}
+				targetIDs, bulk, err := resolveScreenIDs(cmd, singleScreenID, ids, all)
+				if err != nil {
+					return err
+				}
+				body := map[string]any{"screen": map[string]any{"temporary_channel_active": false}}
+				return sendScreenPatch(cmd, targetIDs, bulk, body, "Turned off temporary channel")
+			}
 
 			var singleScreenID, channelID string
 			if ids != "" || all {
@@ -516,6 +538,9 @@ func newScreensTempChannelCmd() *cobra.Command {
 			} else {
 				screen["temporary_channel_active"] = true
 			}
+			if duration < 0 {
+				return fmt.Errorf("--duration must be a positive number of seconds")
+			}
 			if duration > 0 {
 				screen["temporary_channel_duration"] = duration
 			}
@@ -534,6 +559,7 @@ func newScreensTempChannelCmd() *cobra.Command {
 		},
 	}
 	addTargetFlags(cmd)
+	cmd.Flags().BoolVar(&off, "off", false, "Turn the temporary channel off (no channel-id needed)")
 	cmd.Flags().IntVar(&duration, "duration", 0, "Duration in seconds")
 	cmd.Flags().StringVar(&until, "until", "", "ISO8601 timestamp until which override is active")
 	cmd.Flags().BoolVar(&toggle, "toggle", false, "Toggle temporary channel active state")
@@ -582,7 +608,7 @@ func newScreensWatchCmd() *cobra.Command {
 func newScreensWaitOnlineCmd() *cobra.Command {
 	var timeout int
 
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "wait-online <id>",
 		Short: "Block until a screen comes online (useful in scripts)",
 		Args:  cobra.ExactArgs(1),
@@ -592,15 +618,13 @@ func newScreensWaitOnlineCmd() *cobra.Command {
 			fmt.Printf("Waiting for screen %s to come online...\n", args[0])
 
 			for {
-				var resp map[string]any
-				if err := a.Client.Get("/screens/"+args[0], nil, &resp); err != nil {
+				var screen map[string]any
+				if err := a.Client.Get("/screens/"+args[0], nil, &screen); err != nil {
 					return err
 				}
-				if screen, ok := resp["screen"].(map[string]any); ok {
-					if online, _ := screen["online"].(bool); online {
-						fmt.Printf("Screen %s is online.\n", args[0])
-						return nil
-					}
+				if online, _ := screen["online"].(bool); online {
+					fmt.Printf("Screen %s is online.\n", args[0])
+					return nil
 				}
 				if timeout > 0 && time.Now().After(deadline) {
 					return fmt.Errorf("timed out waiting for screen %s to come online", args[0])
@@ -610,4 +634,6 @@ func newScreensWaitOnlineCmd() *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().IntVar(&timeout, "timeout", 0, "Give up after this many seconds (0 waits forever)")
+	return cmd
 }
