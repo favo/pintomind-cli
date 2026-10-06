@@ -136,23 +136,29 @@ func newScreensDebugCmd() *cobra.Command {
 	return cmd
 }
 
-// runDebug posts a debug command and decodes the answer into out (or prints it with --json).
-func runDebug(cmd *cobra.Command, screenID, command string, body map[string]any, out any) (bool, error) {
+// postDebug posts a debug command and returns the screen's raw answer.
+func postDebug(cmd *cobra.Command, screenID, command string, body map[string]any) (json.RawMessage, error) {
 	// The arguments were fine, so a failure here is the screen's answer, not a usage problem
 	cmd.SilenceUsage = true
 	cmd.SilenceErrors = true
 
-	a := app(cmd)
 	if body == nil {
 		body = map[string]any{}
 	}
 
 	var raw json.RawMessage
-	if err := a.Client.Post("/screens/"+screenID+"/debug/"+command, body, &raw); err != nil {
+	err := app(cmd).Client.Post("/screens/"+screenID+"/debug/"+command, body, &raw)
+	return raw, err
+}
+
+// runDebug posts a debug command and decodes the answer into out (or prints it with --json).
+func runDebug(cmd *cobra.Command, screenID, command string, body map[string]any, out any) (bool, error) {
+	raw, err := postDebug(cmd, screenID, command, body)
+	if err != nil {
 		return false, err
 	}
 
-	if a.JSONOutput {
+	if app(cmd).JSONOutput {
 		var v any
 		_ = json.Unmarshal(raw, &v)
 		printJSON(v)
@@ -261,10 +267,22 @@ func newDebugLogsCmd() *cobra.Command {
 				body["level"] = level
 			}
 
+			// --follow with --json streams each new entry as one JSON line
+			jsonLines := follow && app(cmd).JSONOutput
+			enc := json.NewEncoder(os.Stdout)
+
 			seen := map[string]bool{}
 			for {
 				var logs debugLogs
-				if printed, err := runDebug(cmd, args[0], "logs", body, &logs); err != nil || printed {
+				if jsonLines {
+					raw, err := postDebug(cmd, args[0], "logs", body)
+					if err != nil {
+						return err
+					}
+					if err := json.Unmarshal(raw, &logs); err != nil {
+						return fmt.Errorf("unexpected answer from the screen: %w", err)
+					}
+				} else if printed, err := runDebug(cmd, args[0], "logs", body, &logs); err != nil || printed {
 					return err
 				}
 
@@ -274,7 +292,11 @@ func newDebugLogsCmd() *cobra.Command {
 						continue
 					}
 					seen[key] = true
-					fmt.Println(formatLogEntry(entry))
+					if jsonLines {
+						_ = enc.Encode(entry)
+					} else {
+						fmt.Println(formatLogEntry(entry))
+					}
 				}
 
 				if !follow {
