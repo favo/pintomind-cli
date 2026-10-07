@@ -23,6 +23,10 @@ func NewRootCmd() *cobra.Command {
 		Use:     "pintomind",
 		Short:   "CLI for the Pintomind / Infoskjermen API",
 		Version: version,
+		// Most failures are API errors, not usage problems: don't dump the usage
+		// text, and let Execute print the error exactly once.
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// Check for updates on every command except `update` itself
 			if !isUpdateCmd(cmd) {
@@ -69,6 +73,10 @@ func NewRootCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		return fmt.Errorf("%w\nRun '%s --help' for usage.", err, cmd.CommandPath())
+	})
 
 	root.PersistentFlags().StringVar(&connectionOverride, "connection", "", "Override active connection")
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")
@@ -125,7 +133,7 @@ func NewRootCmd() *cobra.Command {
 
 func Execute() {
 	if err := NewRootCmd().Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
 }

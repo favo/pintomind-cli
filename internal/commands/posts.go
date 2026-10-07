@@ -18,8 +18,9 @@ type Post struct {
 }
 
 type PostsResponse struct {
-	Total int    `json:"total"`
-	Items []Post `json:"items"`
+	Total      int         `json:"total"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+	Items      []Post      `json:"items"`
 }
 
 type Publication struct {
@@ -32,8 +33,9 @@ type Publication struct {
 }
 
 type PublicationsResponse struct {
-	Total int           `json:"total"`
-	Items []Publication `json:"items"`
+	Total      int           `json:"total"`
+	Pagination *Pagination   `json:"pagination,omitempty"`
+	Items      []Publication `json:"items"`
 }
 
 func NewPostsCmd() *cobra.Command {
@@ -62,17 +64,17 @@ func NewPostsCmd() *cobra.Command {
 	cmd.AddCommand(newPostsNotificationsCmd())
 	cmd.AddCommand(newPostsAttachmentsCmd())
 	cmd.AddCommand(newSchemaSubCmd(map[string]string{
-		"attachments": "post_attachments",
-		"calendar":    "post_calendar",
-		"clock":       "post_clock",
-		"counter":     "post_counter",
-		"entur":       "post_entur",
-		"feed":        "post_feed",
-		"forecast":    "post_forecast",
-		"iframe":      "post_iframe",
-		"image":       "post_image",
-		"plain":       "post_plain",
-		"poster":      "post_poster",
+		"attachments":   "post_attachments",
+		"calendar":      "post_calendar",
+		"clock":         "post_clock",
+		"counter":       "post_counter",
+		"entur":         "post_entur",
+		"feed":          "post_feed",
+		"forecast":      "post_forecast",
+		"iframe":        "post_iframe",
+		"image":         "post_image",
+		"plain":         "post_plain",
+		"poster":        "post_poster",
 		"power-price":   "post_power_price",
 		"time-schedule": "post_time_schedule",
 		"video":         "post_video",
@@ -118,7 +120,7 @@ func newPostsListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, p := range resp.Items {
 				rows[i] = []string{
@@ -128,16 +130,20 @@ func newPostsListCmd() *cobra.Command {
 					p.State,
 				}
 			}
-			printTable(cmd, []string{"ID", "TYPE", "NAME", "STATE"}, rows)
+			headers, rows := selectColumns(fields,
+				[]string{"ID", "TYPE", "NAME", "STATE"},
+				[][]string{{"id"}, {"type"}, {"name", "title"}, {"state"}},
+				rows)
+			printTable(cmd, headers, rows)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&postType, "type", "", "Filter by post type alias (comma-separated for multiple)")
-	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. created_at:desc)")
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: name, title, type, created_at, updated_at, edited_at (e.g. created_at:desc)")
 	cmd.Flags().StringVar(&fields, "fields", "", "Comma-separated fields to include")
 	cmd.Flags().BoolVar(&archived, "archived", false, "Show archived posts only")
 	cmd.Flags().BoolVar(&deleted, "deleted", false, "Show soft-deleted posts only")
-	addPaginationFlags(cmd)
+	addPaginationFlags(cmd, 50)
 	return cmd
 }
 
@@ -284,7 +290,7 @@ func newPostsPublicationsCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, p := range resp.Items {
 				pos := ""

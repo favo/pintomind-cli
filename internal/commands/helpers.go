@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -62,6 +63,9 @@ func resolveChannelIDs(cmd *cobra.Command, singleID string, all bool) ([]string,
 }
 
 // sendScreenPatch sends a PATCH to a single screen or to screens/bulk.
+// The API reports success per screen ({success, errors} on the screen object,
+// or on each entry of {screens: [...]} for bulk calls). Failed screens are
+// reported on stderr; the command fails when no screen was updated.
 func sendScreenPatch(cmd *cobra.Command, targetIDs string, bulk bool, body map[string]any, successMsg string) error {
 	a := app(cmd)
 	var resp map[string]any
@@ -77,10 +81,66 @@ func sendScreenPatch(cmd *cobra.Command, targetIDs string, bulk bool, body map[s
 	}
 	if a.JSONOutput {
 		printJSON(resp)
-	} else {
-		fmt.Println(successMsg)
+	}
+
+	results := []any{resp}
+	if bulk {
+		results, _ = resp["screens"].([]any)
+	}
+	var failures []string
+	succeeded := 0
+	for _, raw := range results {
+		screen, _ := raw.(map[string]any)
+		if success, ok := screen["success"].(bool); ok && !success {
+			failures = append(failures, screenFailure(screen))
+			continue
+		}
+		succeeded++
+	}
+
+	if !a.JSONOutput {
+		if succeeded > 0 {
+			if len(failures) > 0 {
+				fmt.Printf("%s (%d of %d screens)\n", successMsg, succeeded, succeeded+len(failures))
+			} else {
+				fmt.Println(successMsg)
+			}
+		}
+		for _, failure := range failures {
+			fmt.Fprintln(os.Stderr, "Failed: "+failure)
+		}
+	}
+	if succeeded == 0 {
+		if len(failures) == 1 {
+			return fmt.Errorf("%s", failures[0])
+		}
+		return fmt.Errorf("no screens were updated")
 	}
 	return nil
+}
+
+// screenFailure describes a screen result with success:false.
+func screenFailure(screen map[string]any) string {
+	label := "screen"
+	if id, ok := screen["id"].(float64); ok {
+		label = fmt.Sprintf("screen %d", int(id))
+	}
+	if name, ok := screen["name"].(string); ok && name != "" {
+		label += fmt.Sprintf(" (%s)", name)
+	}
+	var messages []string
+	switch errs := screen["errors"].(type) {
+	case []any:
+		for _, e := range errs {
+			messages = append(messages, fmt.Sprint(e))
+		}
+	case string:
+		messages = append(messages, errs)
+	}
+	if len(messages) == 0 {
+		return label + ": update failed"
+	}
+	return label + ": " + strings.Join(messages, "; ")
 }
 
 // addTargetFlags attaches --ids and --all to a command and returns pointers to them.
@@ -93,9 +153,14 @@ func addTargetFlags(cmd *cobra.Command) (ids *string, all *bool) {
 }
 
 // addPaginationFlags attaches --page and --per-page to a list command.
-func addPaginationFlags(cmd *cobra.Command) {
+// apiDefault is the endpoint's default page size; pass 0 when it is unknown.
+func addPaginationFlags(cmd *cobra.Command, apiDefault ...int) {
+	usage := "Results per page (API default varies by endpoint; max 1000)"
+	if len(apiDefault) > 0 && apiDefault[0] > 0 {
+		usage = fmt.Sprintf("Results per page (API default: %d, max 1000)", apiDefault[0])
+	}
 	cmd.Flags().Int("page", 0, "Page number")
-	cmd.Flags().Int("per-page", 0, "Results per page (API default: 200)")
+	cmd.Flags().Int("per-page", 0, usage)
 }
 
 // applyPagination adds page/per-page to a query if set.

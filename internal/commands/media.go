@@ -25,8 +25,9 @@ type MediaCollection struct {
 }
 
 type MediaCollectionsResponse struct {
-	Total int               `json:"total"`
-	Items []MediaCollection `json:"items"`
+	Total      int               `json:"total"`
+	Pagination *Pagination       `json:"pagination,omitempty"`
+	Items      []MediaCollection `json:"items"`
 }
 
 type Media struct {
@@ -41,8 +42,9 @@ type Media struct {
 }
 
 type MediaResponse struct {
-	Total int     `json:"total"`
-	Items []Media `json:"items"`
+	Total      int         `json:"total"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+	Items      []Media     `json:"items"`
 }
 
 type directUploadResponse struct {
@@ -108,7 +110,7 @@ func newMediaCollectionsListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, c := range resp.Items {
 				defaultCollection := "no"
@@ -128,8 +130,8 @@ func newMediaCollectionsListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&fields, "fields", "", "Comma-separated fields to include")
-	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. title, title:desc)")
-	addPaginationFlags(cmd)
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: title, category, sort, created_at, updated_at (e.g. title, title:desc)")
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 
@@ -287,7 +289,7 @@ func newMediaListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, m := range resp.Items {
 				rows[i] = []string{
@@ -303,21 +305,21 @@ func newMediaListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&fields, "fields", "", "Comma-separated fields to include")
-	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name, created_at:desc)")
-	addPaginationFlags(cmd)
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: name, created_at, updated_at (e.g. name, created_at:desc)")
+	addPaginationFlags(cmd, 50)
 	return cmd
 }
 
 func newMediaUploadCmd() *cobra.Command {
 	var name, description, contentType string
-	var extractPages, wait bool
+	var wait bool
 
 	cmd := &cobra.Command{
 		Use:   "upload <collection-id> <file-or-url>",
 		Short: "Upload a file or URL to a media collection",
 		Example: `  pintomind media upload 42 ./cat.jpg --name "Cat photo"
   pintomind media upload 42 https://example.com/cat.jpg --name "Cat photo"
-  pintomind media upload 42 ./deck.pdf --extract-pages --wait`,
+  pintomind media upload 42 ./deck.pdf --wait   # pages are extracted automatically in image/video collections`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
@@ -374,9 +376,6 @@ func newMediaUploadCmd() *cobra.Command {
 				mediaAttrs["description"] = description
 			}
 			claimBody := map[string]any{"media": mediaAttrs}
-			if extractPages {
-				claimBody["extract_pages"] = true
-			}
 
 			var taskResp TaskResponse
 			if err := a.Client.Post("/media_collections/"+collectionID+"/media", claimBody, &taskResp); err != nil {
@@ -406,14 +405,14 @@ func newMediaUploadCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Media name")
 	cmd.Flags().StringVar(&description, "description", "", "Media description")
 	cmd.Flags().StringVar(&contentType, "content-type", "", "Override detected MIME content type")
-	cmd.Flags().BoolVar(&extractPages, "extract-pages", false, "Extract pages from an uploaded PDF")
+	addDeprecatedExtractPagesFlag(cmd)
 	cmd.Flags().BoolVar(&wait, "wait", false, "Wait for processing to complete and print media IDs")
 	return cmd
 }
 
 func newMediaCreateCmd() *cobra.Command {
 	var source, name, description string
-	var extractPages, wait bool
+	var wait bool
 
 	cmd := &cobra.Command{
 		Use:   "create <collection-id> --source <signed-id>",
@@ -429,9 +428,6 @@ func newMediaCreateCmd() *cobra.Command {
 				media["description"] = description
 			}
 			body := map[string]any{"media": media}
-			if extractPages {
-				body["extract_pages"] = true
-			}
 
 			var taskResp TaskResponse
 			if err := a.Client.Post("/media_collections/"+args[0]+"/media", body, &taskResp); err != nil {
@@ -461,7 +457,7 @@ func newMediaCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&source, "source", "", "Active Storage signed_id from POST /direct_uploads (required)")
 	cmd.Flags().StringVar(&name, "name", "", "Media name")
 	cmd.Flags().StringVar(&description, "description", "", "Media description")
-	cmd.Flags().BoolVar(&extractPages, "extract-pages", false, "Extract pages from an uploaded PDF")
+	addDeprecatedExtractPagesFlag(cmd)
 	cmd.Flags().BoolVar(&wait, "wait", false, "Wait for processing to complete and print media IDs")
 	_ = cmd.MarkFlagRequired("source")
 	return cmd
@@ -764,4 +760,12 @@ func formatBytes(size int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %ciB", float64(size)/float64(div), "KMGTPE"[exp])
+}
+
+// addDeprecatedExtractPagesFlag keeps --extract-pages accepted so existing
+// scripts don't break. It has no effect: the server extracts PDF pages
+// automatically when a PDF is uploaded to an image or video collection.
+func addDeprecatedExtractPagesFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("extract-pages", false, "Deprecated: PDF pages are extracted automatically")
+	_ = cmd.Flags().MarkDeprecated("extract-pages", "PDF pages are extracted automatically when uploading to an image or video collection; the flag has no effect")
 }

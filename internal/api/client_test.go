@@ -53,6 +53,32 @@ func TestClientPreservesExistingErrorMessage(t *testing.T) {
 	}
 }
 
+func TestClientShowsUnpermittedParamsFor422(t *testing.T) {
+	client := newTestClient(http.StatusUnprocessableEntity, `{"success":false,"error":"Unpermitted parameters","unpermitted_params":["foo"],"permitted_params":{"media":["name","description",{"settings":["a"]}]}}`)
+	err := client.Patch("/media/1", map[string]any{}, nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	want := "API error 422: Unpermitted parameters; unpermitted params: foo; permitted params: media[name, description, settings[a]]"
+	if err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestClientShowsErrorAndErrorsArray(t *testing.T) {
+	client := newTestClient(http.StatusUnprocessableEntity, `{"success":false,"error":"Invalid","errors":["Name can't be blank","Url is invalid"]}`)
+	err := client.Post("/resources", map[string]any{}, nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	want := "API error 422: Invalid; Name can't be blank; Url is invalid"
+	if err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
+	}
+}
+
 func newTestClient(statusCode int, body string) *Client {
 	client := New("https://example.test", "token")
 	client.HTTPClient = &http.Client{

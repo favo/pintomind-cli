@@ -20,8 +20,9 @@ type Webhook struct {
 }
 
 type WebhooksResponse struct {
-	Total int       `json:"total"`
-	Items []Webhook `json:"items"`
+	Total      int         `json:"total"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+	Items      []Webhook   `json:"items"`
 }
 
 type WebhookEvent struct {
@@ -65,8 +66,9 @@ type WebhookDelivery struct {
 }
 
 type WebhookDeliveriesResponse struct {
-	Total int               `json:"total"`
-	Items []WebhookDelivery `json:"items"`
+	Total      int               `json:"total"`
+	Pagination *Pagination       `json:"pagination,omitempty"`
+	Items      []WebhookDelivery `json:"items"`
 }
 
 func newWebhooksDeliveriesCmd() *cobra.Command {
@@ -89,7 +91,7 @@ func newWebhooksDeliveriesCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, d := range resp.Items {
 				status := "-"
@@ -109,7 +111,7 @@ func newWebhooksDeliveriesCmd() *cobra.Command {
 			return nil
 		},
 	}
-	addPaginationFlags(cmd)
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 
@@ -137,7 +139,7 @@ func newWebhooksListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, w := range resp.Items {
 				screen := "all"
@@ -158,7 +160,7 @@ func newWebhooksListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (created_at|updated_at, e.g. created_at:desc)")
-	addPaginationFlags(cmd)
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 

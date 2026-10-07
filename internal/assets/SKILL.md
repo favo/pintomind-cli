@@ -585,7 +585,7 @@ pintomind media-boxes show <id>
 pintomind media-boxes create media --media-id 42
 pintomind media-boxes create media --media-id 42 --background-size cover --x 0.5 --y 0.5
 pintomind media-boxes create icon --icon-name rocket-launch --icon-type regular
-pintomind media-boxes create icon --icon-name rocket-launch --icon-type solid --relative-size 0.8
+pintomind media-boxes create icon --icon-name rocket-launch --icon-type duotone --relative-size 0.8
 pintomind media-boxes create emoji --emoji '✨'
 pintomind media-boxes create gif --gif-id xT9IgG50Fb7Mi0only
 pintomind media-boxes create unsplash --photo-id abc123 --background-size cover

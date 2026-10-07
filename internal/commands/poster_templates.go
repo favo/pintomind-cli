@@ -9,16 +9,17 @@ import (
 )
 
 type PosterTemplate struct {
-	ID             int      `json:"id"`
-	Name           string   `json:"name"`
-	AspectRatios   []string `json:"aspect_ratios"`
-	ResourceID     int      `json:"resource_id"`
-	RawPosterData  string   `json:"raw_poster_data"`
+	ID            int      `json:"id"`
+	Name          string   `json:"name"`
+	AspectRatios  []string `json:"aspect_ratios"`
+	ResourceID    int      `json:"resource_id"`
+	RawPosterData string   `json:"raw_poster_data"`
 }
 
 type PosterTemplatesResponse struct {
-	Total int              `json:"total"`
-	Items []PosterTemplate `json:"items"`
+	Total      int              `json:"total"`
+	Pagination *Pagination      `json:"pagination,omitempty"`
+	Items      []PosterTemplate `json:"items"`
 }
 
 func NewPosterTemplatesCmd() *cobra.Command {
@@ -54,7 +55,7 @@ func newPosterTemplatesListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, t := range resp.Items {
 				ratios := ""
@@ -75,8 +76,8 @@ func newPosterTemplatesListCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name:asc)")
-	addPaginationFlags(cmd)
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: name, created_at, updated_at (e.g. name, updated_at:desc)")
+	addPaginationFlags(cmd, 50)
 	return cmd
 }
 

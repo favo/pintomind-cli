@@ -134,6 +134,14 @@ precedence over the env vars.
 | `--json` | Output raw JSON (useful for scripting and piping to `jq`) |
 | `--verbose` / `-v` | Print HTTP request URL and response status to stderr |
 
+### Lists, pagination and errors
+
+- List commands print `Total: N` from `pagination.total_count` (all matching records, not just the current page) and show `page X/Y` when there are more pages. `--json` output keeps the `pagination` object.
+- `--per-page` defaults vary by endpoint (50 for posts, publications, notifications, poster templates, media and media boxes; 200 elsewhere); the maximum is 1000.
+- With `--fields`, table output only shows the columns you asked for.
+- API errors are printed once to stderr (no usage dump) and the command exits non-zero. Validation errors include the server's details, e.g. `unpermitted params` / `permitted params` and field errors.
+- Screen updates and actions (single, `--ids` or `--all`) report each screen the server could not update on stderr, and exit non-zero when no screen was updated.
+
 ---
 
 ## Commands
@@ -481,7 +489,7 @@ pintomind resources update <id> --data '{"label":"Updated label"}'
 pintomind resources append <id> --items '[{"text":"New item"}]'
 ```
 
-**Delete a resource** (soft-delete on first call, hard-delete on second):
+**Delete a resource** (soft-delete on first call, hard-delete on second; the server's message says which happened):
 
 ```bash
 pintomind resources delete <id>
@@ -520,20 +528,22 @@ pintomind media delete <id> --force
 ```bash
 pintomind media upload <collection-id> ./photo.jpg --name "Lobby photo"
 pintomind media upload <collection-id> https://example.com/photo.jpg --name "Lobby photo"
-pintomind media upload <collection-id> ./deck.pdf --extract-pages
+pintomind media upload <collection-id> ./deck.pdf
 ```
+
+PDF pages are extracted automatically when a PDF is uploaded to an image or video collection. The old `--extract-pages` flag is deprecated and has no effect (it is still accepted so existing scripts keep working).
 
 Uploads return a task immediately (`202 Accepted`). Use `--wait` to block until processing finishes and print the resulting media IDs:
 
 ```bash
-pintomind media upload <collection-id> ./deck.pdf --extract-pages --wait
+pintomind media upload <collection-id> ./deck.pdf --wait
 ```
 
 For advanced flows, claim an already-created direct upload signed ID:
 
 ```bash
 pintomind media create <collection-id> --source <signed-id> --name "Uploaded file"
-pintomind media create <collection-id> --source <signed-id> --extract-pages --wait
+pintomind media create <collection-id> --source <signed-id> --wait
 ```
 
 ### Tasks
@@ -595,7 +605,8 @@ pintomind media-boxes show <id>
 # Create boxes
 pintomind media-boxes create media --media-id 42
 pintomind media-boxes create media --media-id 42 --background-size cover --x 0.5 --y 0.5
-pintomind media-boxes create icon --icon-name rocket-launch --icon-type regular
+pintomind media-boxes create icon --icon-name rocket-launch               # icon type defaults to regular
+pintomind media-boxes create icon --icon-name rocket-launch --icon-type duotone
 pintomind media-boxes create emoji --emoji '✨'
 pintomind media-boxes create gif --gif-id xT9IgG50Fb7Mi0only
 pintomind media-boxes create unsplash --photo-id abc123
@@ -615,7 +626,7 @@ pintomind posts create --type plain --data '{
 }'
 ```
 
-Media box types: `media` (requires `media_id`), `icon` (requires `icon_name`, usually `icon_type`), `emoji` (requires `emoji`), `gif` (requires `gif_id`, `gif_url`), `unsplash` (requires `photo_url`). Inspect exact fields with `pintomind schemas show media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, or `media_box_unsplash`.
+Media box types: `media` (requires `media_id`), `icon` (requires `icon_name`; optional `icon_type`: `regular` (default), `thin`, `light`, `bold`, `fill`, `duotone`), `emoji` (requires `emoji`), `gif` (requires `gif_id`, `gif_url`), `unsplash` (requires `photo_url`). `--background-size` accepts `cover` or `contain`. Inspect exact fields with `pintomind schemas show media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, or `media_box_unsplash`.
 
 Browse available icon names:
 
@@ -629,7 +640,7 @@ pintomind icons --json | jq '[.[] | select(.category == "communication")]'
 Inspect the API schema for resource types (useful for knowing which fields are valid in `--data`):
 
 ```bash
-pintomind schemas list
+pintomind schemas list             # uses GET /schemas.json (falls back to the HTML index on older servers)
 pintomind schemas show <id>
 pintomind schemas show text
 pintomind schemas show feed
@@ -685,7 +696,11 @@ pintomind font-families create remote-css --name "Inter" --url "https://fonts.go
 # Upload font files (.ttf/.otf/.woff/.woff2)
 pintomind font-families create uploaded --name "MyFont" --font-normal ./MyFont-Regular.ttf --font-bold ./MyFont-Bold.ttf
 
+# Force a text-transform: initial, none, uppercase, lowercase or capitalize (empty clears it)
+pintomind font-families create remote-css --name "Bebas" --url "https://fonts.googleapis.com/css2?family=Bebas+Neue" --force-text-transform uppercase
+
 pintomind font-families update <id> --name "Renamed"
+pintomind font-families update <id> --force-text-transform none
 pintomind font-families delete <id>
 ```
 
@@ -700,7 +715,7 @@ pintomind api GET /channels?sort_by=name
 echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 ```
 
-`METHOD` defaults to `GET`. For `POST`, `PATCH`, and `PUT`, the JSON body is read from stdin.
+`METHOD` defaults to `GET`. For `POST`, `PATCH`, and `PUT`, the JSON body is read from stdin. The response body is always printed; the command exits non-zero when the server answers with HTTP 4xx/5xx.
 
 ---
 

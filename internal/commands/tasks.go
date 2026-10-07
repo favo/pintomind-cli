@@ -16,7 +16,7 @@ type Task struct {
 	Status   string      `json:"status"`
 	Progress int         `json:"progress"`
 	Result   *TaskResult `json:"result"`
-	Error    string      `json:"error"`
+	Error    *string     `json:"error"`
 }
 
 type TaskResult struct {
@@ -102,7 +102,11 @@ func waitForTask(a *appctx.App, taskID int) ([]int, error) {
 			if !a.JSONOutput {
 				fmt.Fprintf(os.Stderr, "\033[2K\r")
 			}
-			return nil, fmt.Errorf("task %d failed: %s", taskID, resp.Task.Error)
+			message := "unknown error"
+			if resp.Task.Error != nil && *resp.Task.Error != "" {
+				message = *resp.Task.Error
+			}
+			return nil, fmt.Errorf("task %d failed: %s", taskID, message)
 		}
 		if !a.JSONOutput && resp.Task.Progress > 0 {
 			fmt.Fprintf(os.Stderr, "\033[2K\rProcessing... %d%%", resp.Task.Progress)

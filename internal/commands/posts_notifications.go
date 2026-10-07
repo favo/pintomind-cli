@@ -23,8 +23,9 @@ type PostNotification struct {
 }
 
 type PostNotificationsResponse struct {
-	Total int                `json:"total"`
-	Items []PostNotification `json:"items"`
+	Total      int                `json:"total"`
+	Pagination *Pagination        `json:"pagination,omitempty"`
+	Items      []PostNotification `json:"items"`
 }
 
 func newPostsNotificationsCmd() *cobra.Command {
@@ -69,7 +70,7 @@ func newPostsNotificationsListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, n := range resp.Items {
 				rows[i] = []string{
@@ -86,7 +87,7 @@ func newPostsNotificationsListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&status, "status", "", "Filter by status: queued or sent")
-	addPaginationFlags(cmd)
+	addPaginationFlags(cmd, 50)
 	return cmd
 }
 

@@ -3,11 +3,12 @@ package commands
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
-
 
 type FontFamily struct {
 	ID   int    `json:"id"`
@@ -17,8 +18,9 @@ type FontFamily struct {
 }
 
 type FontFamiliesResponse struct {
-	Total int          `json:"total"`
-	Items []FontFamily `json:"items"`
+	Total      int          `json:"total"`
+	Pagination *Pagination  `json:"pagination,omitempty"`
+	Items      []FontFamily `json:"items"`
 }
 
 func NewFontFamiliesCmd() *cobra.Command {
@@ -67,7 +69,7 @@ func newFontFamiliesListCmd() *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Total: %d\n\n", resp.Total)
+			printTotal(resp.Total, resp.Pagination)
 			rows := make([][]string, len(resp.Items))
 			for i, f := range resp.Items {
 				rows[i] = []string{strconv.Itoa(f.ID), f.Type, f.Name, f.URL}
@@ -77,8 +79,8 @@ func newFontFamiliesListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&fontType, "type", "", "Filter by type: remote_css, uploaded, standard (comma-separated)")
-	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field (e.g. name:asc)")
-	addPaginationFlags(cmd)
+	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: name, created_at, updated_at (e.g. name, updated_at:desc)")
+	addPaginationFlags(cmd, 200)
 	return cmd
 }
 
@@ -127,7 +129,8 @@ func newFontFamiliesCreateCmd() *cobra.Command {
 
 func newFontFamiliesCreateRemoteCSSCmd() *cobra.Command {
 	var name, fontURL, fontName string
-	var suitableForBody, forceTextTransform bool
+	var suitableForBody bool
+	var forceTextTransform string
 
 	cmd := &cobra.Command{
 		Use:   "remote-css --name <name> --url <url>",
@@ -144,6 +147,9 @@ func newFontFamiliesCreateRemoteCSSCmd() *cobra.Command {
 				fontFamily["suitable_for_body"] = suitableForBody
 			}
 			if cmd.Flags().Changed("force-text-transform") {
+				if err := validateTextTransform(forceTextTransform); err != nil {
+					return err
+				}
 				fontFamily["force_text_transform"] = forceTextTransform
 			}
 			var resp map[string]any
@@ -158,7 +164,7 @@ func newFontFamiliesCreateRemoteCSSCmd() *cobra.Command {
 	cmd.Flags().StringVar(&fontURL, "url", "", "Hosted CSS URL, e.g. Google Fonts URL (required)")
 	cmd.Flags().StringVar(&fontName, "font-name", "", "CSS font-family name override (picked from CSS if omitted)")
 	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Mark font as suitable for body text")
-	cmd.Flags().BoolVar(&forceTextTransform, "force-text-transform", false, "Force text transform")
+	addTextTransformFlag(cmd, &forceTextTransform)
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("url")
 	return cmd
@@ -166,7 +172,8 @@ func newFontFamiliesCreateRemoteCSSCmd() *cobra.Command {
 
 func newFontFamiliesCreateUploadedCmd() *cobra.Command {
 	var name, fontNormal, fontBold, fontItalic, fontBoldItalic string
-	var suitableForBody, forceTextTransform bool
+	var suitableForBody bool
+	var forceTextTransform string
 
 	cmd := &cobra.Command{
 		Use:   "uploaded --name <name> --font-normal <file> --font-bold <file>",
@@ -183,7 +190,10 @@ func newFontFamiliesCreateUploadedCmd() *cobra.Command {
 				fields["font_family[suitable_for_body]"] = fmt.Sprintf("%v", suitableForBody)
 			}
 			if cmd.Flags().Changed("force-text-transform") {
-				fields["font_family[force_text_transform]"] = fmt.Sprintf("%v", forceTextTransform)
+				if err := validateTextTransform(forceTextTransform); err != nil {
+					return err
+				}
+				fields["font_family[force_text_transform]"] = forceTextTransform
 			}
 			files := map[string]string{
 				"font_family[font_normal]": fontNormal,
@@ -209,7 +219,7 @@ func newFontFamiliesCreateUploadedCmd() *cobra.Command {
 	cmd.Flags().StringVar(&fontItalic, "font-italic", "", "Path to italic font file (optional)")
 	cmd.Flags().StringVar(&fontBoldItalic, "font-bold-italic", "", "Path to bold-italic font file (optional)")
 	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Mark font as suitable for body text")
-	cmd.Flags().BoolVar(&forceTextTransform, "force-text-transform", false, "Force text transform")
+	addTextTransformFlag(cmd, &forceTextTransform)
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("font-normal")
 	_ = cmd.MarkFlagRequired("font-bold")
@@ -218,7 +228,8 @@ func newFontFamiliesCreateUploadedCmd() *cobra.Command {
 
 func newFontFamiliesUpdateCmd() *cobra.Command {
 	var name, fontURL, fontName string
-	var suitableForBody, forceTextTransform bool
+	var suitableForBody bool
+	var forceTextTransform string
 	var fontNormal, fontBold, fontItalic, fontBoldItalic string
 
 	cmd := &cobra.Command{
@@ -244,7 +255,10 @@ func newFontFamiliesUpdateCmd() *cobra.Command {
 					fields["font_family[suitable_for_body]"] = fmt.Sprintf("%v", suitableForBody)
 				}
 				if cmd.Flags().Changed("force-text-transform") {
-					fields["font_family[force_text_transform]"] = fmt.Sprintf("%v", forceTextTransform)
+					if err := validateTextTransform(forceTextTransform); err != nil {
+						return err
+					}
+					fields["font_family[force_text_transform]"] = forceTextTransform
 				}
 				if fontNormal != "" {
 					files["font_family[font_normal]"] = fontNormal
@@ -284,6 +298,9 @@ func newFontFamiliesUpdateCmd() *cobra.Command {
 				fontFamily["suitable_for_body"] = suitableForBody
 			}
 			if cmd.Flags().Changed("force-text-transform") {
+				if err := validateTextTransform(forceTextTransform); err != nil {
+					return err
+				}
 				fontFamily["force_text_transform"] = forceTextTransform
 			}
 			if len(fontFamily) == 0 {
@@ -305,7 +322,7 @@ func newFontFamiliesUpdateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&fontItalic, "font-italic", "", "Path to italic font file (uploaded only)")
 	cmd.Flags().StringVar(&fontBoldItalic, "font-bold-italic", "", "Path to bold-italic font file (uploaded only)")
 	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Mark font as suitable for body text")
-	cmd.Flags().BoolVar(&forceTextTransform, "force-text-transform", false, "Force text transform")
+	addTextTransformFlag(cmd, &forceTextTransform)
 	return cmd
 }
 
@@ -337,4 +354,18 @@ func newFontFamiliesDeleteCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
 	return cmd
+}
+
+// textTransforms are the values the API accepts for force_text_transform.
+var textTransforms = []string{"initial", "none", "uppercase", "lowercase", "capitalize"}
+
+func addTextTransformFlag(cmd *cobra.Command, target *string) {
+	cmd.Flags().StringVar(target, "force-text-transform", "", "Force a CSS text-transform: "+strings.Join(textTransforms, ", ")+" (empty clears it)")
+}
+
+func validateTextTransform(value string) error {
+	if value == "" || slices.Contains(textTransforms, value) {
+		return nil
+	}
+	return fmt.Errorf("invalid --force-text-transform %q — valid values: %s", value, strings.Join(textTransforms, ", "))
 }
