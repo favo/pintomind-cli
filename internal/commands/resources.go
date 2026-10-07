@@ -259,7 +259,6 @@ func newResourcesDeleteCmd() *cobra.Command {
 			}
 			if a.JSONOutput {
 				printJSON(resp)
-				return nil
 			}
 			message, _ := resp["message"].(string)
 			if success, ok := resp["success"].(bool); ok && !success {
@@ -267,6 +266,9 @@ func newResourcesDeleteCmd() *cobra.Command {
 					message = "delete failed"
 				}
 				return fmt.Errorf("resource %s: %s", args[0], message)
+			}
+			if a.JSONOutput {
+				return nil
 			}
 			if message != "" {
 				fmt.Printf("Resource %s: %s\n", args[0], message)
