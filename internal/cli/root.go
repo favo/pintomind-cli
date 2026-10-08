@@ -70,6 +70,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(commands.NewMeCmd())
 	root.AddCommand(commands.NewNetworkCmd())
 	root.AddCommand(commands.NewScreensCmd())
+	root.AddCommand(commands.NewScheduleTemplatesCmd())
 	root.AddCommand(commands.NewChannelsCmd())
 	root.AddCommand(commands.NewResourcesCmd())
 	root.AddCommand(commands.NewMediaCollectionsCmd())
@@ -108,6 +109,7 @@ func isConnectionCmd(cmd *cobra.Command) bool {
 	return false
 }
 
+// Only the top-level self-update; `themes update` and friends need the API client
 func isUpdateCmd(cmd *cobra.Command) bool {
-	return cmd.Name() == "update"
+	return cmd.Name() == "update" && cmd.Parent() == cmd.Root()
 }

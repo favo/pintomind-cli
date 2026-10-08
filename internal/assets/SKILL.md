@@ -1,6 +1,6 @@
 ---
 name: pintomind
-description: Interact with Pintomind / Infoskjermen screens, channels, resources, media, themes, color palettes, and font families via the pintomind CLI. Use for ANY Pintomind question or action.
+description: Interact with Pintomind / Infoskjermen screens (including channel schedules / tidsstyring, night mode and reboot), channels, resources, media, themes, color palettes, and font families via the pintomind CLI. Use for ANY Pintomind question or action.
 ---
 
 You are an expert at using the `pintomind` CLI to interact with the Pintomind / Infoskjermen API. You help users manage screens, channels, resources, media, posts, themes, color palettes, and font families.
@@ -89,6 +89,47 @@ pintomind screens temp-channel <screen-id> <channel-id> --until 2025-12-31T23:59
 pintomind screens temp-channel --all <channel-id> --duration 1800
 pintomind screens temp-channel <screen-id> <channel-id> --toggle
 ```
+
+### Channel schedule (tidsstyring)
+
+Which channel a screen shows at what time of day, night mode and reboot. A screen has a day plan (every day)
+and a week plan (blocks per weekday, `wday` 0 = Sunday); `mode` daily/weekly picks the active one and both
+are kept. Gaps show the standard channel; a temporary channel always wins. Times are in the time zone of the
+screen's standard channel.
+
+```bash
+pintomind screens schedule show <screen-id>            # --json for the raw schedule
+pintomind screens schedule add <screen-id> --channel <channel-id> --from 07:00 --to 09:30
+pintomind screens schedule add <screen-id> --night --from 23:00 --to 06:00 [--animation sleepy|sleepy_rooster] [--device-off]
+pintomind screens schedule add <screen-id> --reboot 2  # restart at a random minute 02:00–03:00
+pintomind screens schedule add <screen-id> --channel <id> --wday 5 --from 15:00 --to 17:00   # week plan
+pintomind screens schedule set <screen-id> --mode weekly      # first switch copies the day plan to every weekday
+pintomind screens schedule set [id|--ids ...|--all] --data '{"day_plan":[...],"week_plan":[...]}'   # replaces whole plans
+pintomind screens schedule set <screen-id> --file schedule.json   # --file - reads stdin
+pintomind screens schedule apply-template [id|--ids ...|--all] <template-id>
+pintomind screens schedule clear [id|--ids ...|--all]  # standard channel all day, no night mode or reboot
+
+# Copy one screen's schedule to others
+pintomind screens schedule show 42 --json | jq .channel_schedule | pintomind screens schedule set --ids 43,44 --file -
+```
+
+Blocks: `{"type":"channel","channel_id":12,"from_time":"07:00","to_time":"09:30"}`,
+`{"type":"night","from_time":"23:00","to_time":"06:00","device_off":false,"animation_type":"sleepy"}`,
+`{"type":"reboot","hour":2}`; week plan blocks add `"wday"`. A `to_time` before `from_time` runs past midnight
+and comes back as two halves split at midnight. Overlapping blocks and more than one reboot per day are
+rejected with a 422 naming the block.
+
+### Schedule templates
+
+```bash
+pintomind schedule-templates list
+pintomind schedule-templates show <id>
+pintomind schedule-templates create --name Kantine --data '{"day_plan":[...]}'   # or --file
+pintomind schedule-templates update <id> [--name ...] [--mode daily|weekly] [--data '...']   # updates every linked screen
+pintomind schedule-templates delete <id>                # linked screens keep their schedules
+```
+
+Templates belong to an account (account API key). A screen stays linked until its own schedule changes.
 
 ## Channels
 

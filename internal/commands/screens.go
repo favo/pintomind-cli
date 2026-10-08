@@ -37,6 +37,7 @@ func NewScreensCmd() *cobra.Command {
 	// Channel assignment
 	cmd.AddCommand(newScreensSetChannelCmd())
 	cmd.AddCommand(newScreensTempChannelCmd())
+	cmd.AddCommand(newScreensScheduleCmd())
 
 	// Direct commands
 	cmd.AddCommand(newScreenActionCmd("reload", "Reload the screen", "reload", ""))
