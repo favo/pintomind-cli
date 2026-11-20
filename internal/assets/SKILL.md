@@ -7,19 +7,50 @@ You are an expert at using the `pintomind` CLI to interact with the Pintomind / 
 
 ## Setup
 
-Config is stored in `~/.config/pintomind/config.json`. Multiple connections are supported.
+Config is stored in `~/.config/pintomind/config.json`. Multiple connections are supported. A
+connection either logs in with the user's own account (OAuth, `pintomind login`) or uses an API key.
 
 ```bash
+# Log in with the user's account in the browser (recommended). Tokens go in the OS keychain.
+pintomind login                                       # https://app.infoskjermen.no
+pintomind login --url https://app.pintomind.com
+pintomind login --name develop --url https://develop.infoskjermen.no
+pintomind logout                                      # revoke the login, keep the connection
+
+# API keys (scripts, CI, machines without a browser)
 pintomind connection add app.infoskjermen.no sk-xxx
 pintomind connection add develop sk-dev --url https://develop.infoskjermen.no
+
 pintomind connection use develop
-pintomind connection list
-pintomind connection show   # show active connection and masked API key
+pintomind connection list                             # auth type and what each connection acts for
+pintomind connection show                             # active connection details
 ```
+
+`pintomind login` needs a browser on the same machine (it listens on 127.0.0.1 for the redirect);
+over SSH, use an API key. If the CLI knows no OAuth client for a host it asks for `--client-id`.
+
+### Accounts and networks (OAuth connections)
+
+An OAuth login belongs to the user, not to one account. Each OAuth connection acts for one account
+(requests send `Account-Id`) or one network (`Network-Id`), chosen after login:
+
+```bash
+pintomind me accounts                       # accounts and networks the login may act for
+pintomind connection use-account <id>       # act for an account (no ID: pick interactively)
+pintomind connection use-network <id>       # act for a network
+pintomind --network-id 7 webhooks list      # override for one command (also --account-id)
+```
+
+Acting for a network reaches what a network API key reaches: screens of members that let the
+network manage them (all screens for some network roles), and network-wide webhooks. Changing
+anything needs a role that may manage the network ("CAN WRITE" in `me accounts`). Endpoints that
+need an account (posts, media, …) answer 403 for a network connection; switch with `use-account`.
+If an account needs SSO, `me accounts` says so: log in again through that SSO.
 
 ## Global Flags
 
 - `--connection <name>` — override active connection for a single command
+- `--account-id <id>` / `--network-id <id>` — act for another account or network for one command (OAuth connections)
 - `--json` — output raw JSON
 - `--verbose` / `-v` — print HTTP request URL and response status to stderr
 
@@ -76,8 +107,37 @@ pintomind screens backwards     [id|--ids ...|--all]
 pintomind screens confetti-fire      [id|--ids ...|--all]
 pintomind screens confetti-fireworks [id|--ids ...|--all]
 pintomind screens school-parade      [id|--ids ...|--all]
-pintomind screens snow               [id|--ids ...|--all]
+pintomind screens snow               [id|--ids ...|--all]   # also: rain, thunderstorm, leaves, hearts, sparkles
+pintomind screens snow 42 --duration 60 --intensity high    # duration in seconds (0 = until stopped); intensity low|medium|high
+pintomind screens stop-effects       [id|--ids ...|--all]
 ```
+
+Weather-like effects (snow, rain, thunderstorm, leaves, hearts, sparkles) replace each other;
+confetti stacks on top. `confetti-fire` is one burst and has no `--duration`. A reload ends effects.
+
+### Disconnect, schedule and provisioning
+
+```bash
+pintomind screens delete <id>                 # disconnect from the account (screen shows a new code)
+
+# Channel schedule: day/week plan, night mode and reboot (times in the standard channel's time zone)
+pintomind screens schedule show <screen-id>
+pintomind screens schedule set <screen-id> --mode daily \
+  --day-plan '[{"type":"channel","channel_id":12,"from_time":"08:00","to_time":"16:00"},{"type":"night","from_time":"22:00","to_time":"06:00"},{"type":"reboot","hour":4}]'
+pintomind screens schedule set <screen-id> --mode weekly --week-plan @week.json   # blocks need "wday" 0 (Sun)..6 (Sat)
+pintomind screens schedule set <screen-id> --template-id 3                        # apply and link a template
+pintomind screens schedule clear <screen-id>
+pintomind screens schedule templates list|show|create|update|delete               # --name --mode --day-plan --week-plan
+
+# One-time provisioning tokens a player redeems to become a screen (secret shown once)
+pintomind screens provisioning create --screen-id 42
+pintomind screens provisioning create --new-screen --name Lobby --channel-id 7 --expires-in 86400
+pintomind screens provisioning list
+pintomind screens provisioning revoke <token-id>
+```
+
+A plan replaces the whole plan; gaps show the standard channel. Night blocks take `device_off`
+(PieOS only) and `animation_type` (`sleepy`, `sleepy_rooster` or null).
 
 ### Channel assignment
 
@@ -151,7 +211,41 @@ pintomind channels stats                # requires channels:read:stats scope
 pintomind channels stats <id>
 pintomind channels set-theme <channel-id> <theme-id>
 pintomind channels set-theme --all <theme-id>
+
+pintomind channels create --name Lobby                                   # screen channel, template AB
+pintomind channels create --name Lobby --template ABC --orientation portrait --extension ticker
+pintomind channels create --name "Our app" --type go
+pintomind channels update <id> --name "New name" --theme-id 3
+pintomind channels update <id> --template AB --orientation landscape   # screen channels
+pintomind channels update <id> --board-label News --board-background-color primary-600   # Go channels
+pintomind channels delete <id>                       # soft-delete (off screens and schedules); again to hard-delete
+pintomind channels layouts [--template AB] [--orientation portrait] [--favorites]   # valid template/orientation/extension
+pintomind channels move-post <channel-id> <post-id> --area B --position 0           # F11 = full screen
+pintomind channels preview <id>                      # signed link, valid an hour, no login
+pintomind channels search kirke                      # public Go channels (channels:search scope)
+pintomind channels search --lat 60.39 --lng 5.32
 ```
+
+Creating and deleting channels needs a role that manages channels.
+
+### Sharing a channel in the Go app
+
+```bash
+pintomind channels sharing show <id>
+pintomind channels sharing start <id> --code menighet         # everyone with a share code (made up without --code)
+pintomind channels sharing start <id> --invites [--web]       # only invited email addresses
+pintomind channels sharing update <id> --web=false            # also open in a browser or not
+pintomind channels sharing stop <id>
+pintomind channels sharing codes add <id> [--code x]          # at most four codes
+pintomind channels sharing codes update <id> <code-id> <new-code>
+pintomind channels sharing codes remove <id> <code-id>
+pintomind channels sharing invites list <id> [--q kari]
+pintomind channels sharing invites add <id> kari@example.com ola@example.com
+pintomind channels sharing invites rename|resend|remove <id> <invite-id> ...
+```
+
+The way of sharing can't be changed: stop and share again. Starting to share needs a login or an
+API key that belongs to a user.
 
 ## Resources
 
@@ -160,7 +254,9 @@ pintomind resources list
 pintomind resources list --type text
 pintomind resources list --type text,calendar_events   # comma-separated
 pintomind resources list --page 2 --per-page 50
+pintomind resources list --include-shared               # also what the account's networks share (shared: true), e.g. leagues
 pintomind resources show <id>
+pintomind resources teams <league-id>                   # teams for a scores_and_fixtures post's follow_team_id
 pintomind resources stats
 pintomind resources refresh <id>
 
@@ -279,7 +375,16 @@ pintomind posts list --page 2 --per-page 50
 pintomind posts show <id>
 pintomind posts delete <id>
 pintomind posts delete <id> --force
+pintomind posts archive <id>                             # unpublishes from every channel
+pintomind posts restore <id>                             # archived or soft-deleted; not republished
+pintomind posts preview <id> [--data '{"title":"x"}'] [--channel-id 7] [--area F11]   # unsaved changes
+pintomind posts preview --type plain --data '{"heading":"<p>Hi</p>"}'                 # a new post
+pintomind posts preview --type poster --source-id 42                                  # a poster template
+pintomind posts plain-layouts                            # valid `variation` values for plain posts
 ```
+
+Previews answer a signed link, valid for an hour, that needs no login. Archiving and restoring need
+the right to delete the post.
 
 ### Creating posts — helper subcommands
 
@@ -413,12 +518,13 @@ pintomind posts create --type image --data '{
   "template":"fullpane"
 }'
 
-# Video post — video_media_id is a single integer
+# Video post — video_media_id for one video, video_media_ids for several played in order
 pintomind posts create --type video --data '{
   "name":"Promo",
   "video_media_id":101,
   "sound":true
 }'
+pintomind posts create --type video --data '{"name":"Promos","video_media_ids":[101,102]}'
 
 # Clock post (no resources)
 pintomind posts create --type clock --data '{
@@ -632,10 +738,14 @@ Removing a box ID from a plain post update deletes the orphaned box. For poster 
 
 Inspect exact fields with `pintomind schemas show media_box_image`, `media_box_icon`, `media_box_emoji`, `media_box_gif`, `media_box_unsplash`, or `media_box_qr_code`.
 
-## Icons
+## Icons, emojis, Unsplash and Giphy
 
 ```bash
-pintomind icons   # lists available icon names, types, and categories for icon media boxes
+pintomind icons                         # icon names, types, and categories for icon media boxes
+pintomind icons arrow --category ui     # only matching names
+pintomind emojis heart                  # `emoji` value for media_box.emoji (preset without a query)
+pintomind unsplash forest [--page 2]    # photo IDs for media_box.photo_id; credit the photographer
+pintomind giphy party [--offset 25]     # GIF IDs for media_box.gif_id; show "Powered by GIPHY"
 ```
 
 Scope: `media_boxes:read`. Returns `{ names: [...], types: [...], categories: [...] }`. Use `icon_name` values here with `pintomind media-boxes create icon --icon-name <name> --icon-type <type>`.
@@ -755,11 +865,32 @@ Font types:
 Deleting a font resets themes using it to the system default (`figtree`).
 Fonts shared with network members cannot be deleted.
 
+## Webhooks
+
+```bash
+pintomind webhooks events                  # event names; NETWORK-WIDE marks those a network may use
+pintomind webhooks list                    # SCOPE: account or network
+pintomind webhooks create --event screen.offline --url https://example.com/hook [--screen-id 42] [--disabled]
+pintomind webhooks show <id>
+pintomind webhooks update <id> --url https://… --enabled=false
+pintomind webhooks test <id>               # synthetic delivery (enabled webhooks only)
+pintomind webhooks deliveries <id>
+pintomind webhooks delete <id>
+```
+
+The secret is in the create response only. Events: `screen.online`, `screen.offline`,
+`screen.paired`, `screen.unpaired`, `resource.refresh_failed`, and `network.*` (accounts that own a
+network). Acting for a network (`connection use-network` or `--network-id`), webhooks are the
+network's network-wide ones: a `screen.*` webhook fires for every screen the network may manage,
+and `--screen-id` must be one of those screens.
+
 ## Identity
 
 ```bash
-pintomind me
-pintomind network
+pintomind me                 # user, account or network, OAuth client or API key
+pintomind me --scopes
+pintomind me accounts        # OAuth: accounts and networks the login may act for
+pintomind network            # network identity (network API key, or a connection acting for a network)
 ```
 
 ## Raw API access
@@ -787,7 +918,9 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Inspect valid resource fields: `pintomind schemas show text`
 - Inspect valid post fields: `pintomind schemas show post_image` (prefix `post_`)
 - Publishing is separate from raw `posts create`: use `posts publish <post-id> --channel-id <channel-id>` or pass `--channel-id` to helper subcommands
-- Image posts use `images:[{"media_id":...}]`; video posts use `video_media_id:<id>` (single integer) — neither uses `resource_ids`
+- Image posts use `images:[{"media_id":...}]`; video posts use `video_media_id:<id>` for one video or `video_media_ids:[...]` for several — neither uses `resource_ids`
 - Post fields are always flat inside `post` — no `options` sub-object
 - Use `--connection develop` to target the dev environment without changing your default.
-- Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens) are required for posts and channel posts.
+- Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens or connections acting for a network) are required for posts and channel posts.
+- A 401 on an OAuth connection is retried after a token refresh; "login has expired or was revoked" means: `pintomind login --name <connection>`.
+- Network webhooks: `pintomind --network-id <id> webhooks create --event screen.offline --url https://…` creates a network-wide webhook firing for every screen the network manages (payload `screen.account_id` names the account).
