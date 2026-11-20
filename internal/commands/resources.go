@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
+
 	"github.com/spf13/cobra"
 )
 
@@ -47,12 +49,14 @@ func NewResourcesCmd() *cobra.Command {
 	}))
 	cmd.AddCommand(newResourcesRefreshCmd())
 	cmd.AddCommand(newResourcesDeleteCmd())
+	cmd.AddCommand(newResourcesTeamsCmd())
 	return cmd
 }
 
 func newResourcesListCmd() *cobra.Command {
 	var resourceType string
 	var sortBy string
+	var includeShared bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -66,6 +70,9 @@ func newResourcesListCmd() *cobra.Command {
 			if sortBy != "" {
 				q.Set("sort_by", sortBy)
 			}
+			if includeShared {
+				q.Set("include_shared", "true")
+			}
 			applyPagination(cmd, q)
 			var resp map[string]any
 			if err := a.Client.Get("/resources", q, &resp); err != nil {
@@ -77,8 +84,39 @@ func newResourcesListCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&resourceType, "type", "", "Filter by resource type alias (comma-separated for multiple)")
 	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: title, type, created_at, updated_at (e.g. title, updated_at:desc)")
+	cmd.Flags().BoolVar(&includeShared, "include-shared", false, "Also list what the account's networks share with it (shared: true), e.g. leagues")
 	addPaginationFlags(cmd, 200)
 	return cmd
+}
+
+func newResourcesTeamsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "teams <league-resource-id>",
+		Short: "List the teams in a sportmonks league (for a scores_and_fixtures post's follow_team_id)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			if a.JSONOutput {
+				return getJSON(cmd, "/resources/"+args[0]+"/teams", nil)
+			}
+			var resp struct {
+				Items []struct {
+					ID        int     `json:"id"`
+					Name      string  `json:"name"`
+					ShortCode *string `json:"short_code"`
+				} `json:"items"`
+			}
+			if err := a.Client.Get("/resources/"+args[0]+"/teams", nil, &resp); err != nil {
+				return err
+			}
+			rows := make([][]string, len(resp.Items))
+			for i, t := range resp.Items {
+				rows[i] = []string{strconv.Itoa(t.ID), t.Name, deref(t.ShortCode)}
+			}
+			printTable(cmd, []string{"ID", "NAME", "SHORT"}, rows)
+			return nil
+		},
+	}
 }
 
 func newResourcesShowCmd() *cobra.Command {

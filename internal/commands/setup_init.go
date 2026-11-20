@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"favo/pintomind-cli/internal/api"
+	"favo/pintomind-cli/internal/auth"
 	"favo/pintomind-cli/internal/config"
 )
 
@@ -20,8 +21,8 @@ func newSetupInitCmd(root *cobra.Command) *cobra.Command {
 		Short:   "Guided first-time setup (connection + skills + completion)",
 		Long: `Walks through first-time configuration:
 
-  1. Add a connection (name + URL + API key)
-  2. Verify the API key by calling /me
+  1. Log in with your user in the browser, or add a connection with an API key
+  2. Verify it by calling /me
   3. Optionally install Claude / Codex skills and shell completion`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runSetupInit(root)
@@ -38,12 +39,9 @@ func runSetupInit(root *cobra.Command) error {
 	fmt.Println("  Let's get you set up. This will only take a minute.")
 	fmt.Println()
 	fmt.Println("  We'll:")
-	fmt.Println("    1. Connect your account with an API key")
+	fmt.Println("    1. Connect: log in with your user, or use an API key")
 	fmt.Println("    2. Verify it works")
 	fmt.Println("    3. (Optional) Install AI skills and shell completion")
-	fmt.Println()
-	fmt.Println("  Don't have an API key yet? Generate one from your")
-	fmt.Println("  Pintomind dashboard at https://app.infoskjermen.no")
 	fmt.Println()
 	fmt.Println("  Press Ctrl+C at any time to cancel.")
 	fmt.Println()
@@ -53,8 +51,16 @@ func runSetupInit(root *cobra.Command) error {
 		return err
 	}
 
-	name, baseURL, apiKey, _, err := promptAndVerifyConnection(cfg)
-	if err != nil {
+	useLogin := true
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[bool]().
+			Title("How do you want to connect?").
+			Options(
+				huh.NewOption("Log in with my user in the browser (recommended)", true),
+				huh.NewOption("Use an API key (for scripts, CI or a machine without a browser)", false),
+			).
+			Value(&useLogin),
+	)).Run(); err != nil {
 		if isAborted(err) {
 			fmt.Println("Aborted.")
 			return nil
@@ -62,12 +68,36 @@ func runSetupInit(root *cobra.Command) error {
 		return err
 	}
 
-	cfg.Domains[name] = config.Domain{APIKey: apiKey, BaseURL: baseURL}
-	cfg.DefaultDomain = name
-	if err := cfg.Save(); err != nil {
-		return fmt.Errorf("saving config: %w", err)
+	if useLogin {
+		if err := setupLogin(); err != nil {
+			if isAborted(err) {
+				fmt.Println("Aborted.")
+				return nil
+			}
+			return err
+		}
+		fmt.Println()
+	} else {
+		fmt.Println()
+		fmt.Println("  Don't have an API key yet? Generate one from your")
+		fmt.Println("  Pintomind dashboard at https://app.infoskjermen.no")
+		fmt.Println()
+		name, baseURL, apiKey, _, err := promptAndVerifyConnection(cfg)
+		if err != nil {
+			if isAborted(err) {
+				fmt.Println("Aborted.")
+				return nil
+			}
+			return err
+		}
+
+		cfg.Domains[name] = config.Domain{APIKey: apiKey, BaseURL: baseURL}
+		cfg.DefaultDomain = name
+		if err := cfg.Save(); err != nil {
+			return fmt.Errorf("saving config: %w", err)
+		}
+		fmt.Printf("Saved connection %q (%s) and set as default.\n\n", name, baseURL)
 	}
-	fmt.Printf("Saved connection %q (%s) and set as default.\n\n", name, baseURL)
 
 	installClaude, err := confirmStep("Install Claude Code skill?", true)
 	if err != nil {
@@ -104,6 +134,30 @@ func runSetupInit(root *cobra.Command) error {
 	fmt.Println()
 	fmt.Println("Setup done. Try: pintomind me")
 	return nil
+}
+
+func setupLogin() error {
+	baseURL := defaultSetupURL
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("Server URL").
+			Description("Press Enter to continue, or edit to use another server.").
+			Value(&baseURL).
+			Validate(huh.ValidateNotEmpty()),
+	)).Run(); err != nil {
+		return err
+	}
+	login := NewLoginCmd()
+	login.SetArgs([]string{"--url", strings.TrimSpace(baseURL)})
+	login.SilenceUsage = true
+	if err := login.Execute(); err != nil {
+		return err
+	}
+	_, err := config.Update(func(cfg *config.Config) error {
+		cfg.DefaultDomain = auth.Host(baseURL)
+		return nil
+	})
+	return err
 }
 
 // promptAndVerifyConnection prompts the user for connection details and verifies

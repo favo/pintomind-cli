@@ -13,6 +13,7 @@ type Webhook struct {
 	Event           string `json:"event"`
 	URL             string `json:"url"`
 	ScreenID        *int   `json:"screen_id"`
+	NetworkWide     bool   `json:"network_wide"`
 	Enabled         bool   `json:"enabled"`
 	LastDeliveredAt string `json:"last_delivered_at"`
 	CreatedAt       string `json:"created_at"`
@@ -29,6 +30,7 @@ type WebhookEvent struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Family      string `json:"family"`
+	NetworkWide bool   `json:"network_wide"`
 }
 
 type WebhookEventsResponse struct {
@@ -39,6 +41,12 @@ func NewWebhooksCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "webhooks",
 		Short: "Manage outbound webhooks",
+		Long: `Manage outbound webhooks.
+
+A connection acting for a network (pintomind connection use-network, or --network-id) manages
+the network's network-wide webhooks: a screen.* webhook created that way fires for every screen
+the network may manage. Deliveries are batched over 30 s with a screens list (at most 500 per
+delivery) whose entries carry the screen's account_id and occurred_at.`,
 	}
 	cmd.AddCommand(newWebhooksListCmd())
 	cmd.AddCommand(newWebhooksEventsCmd())
@@ -146,16 +154,21 @@ func newWebhooksListCmd() *cobra.Command {
 				if w.ScreenID != nil {
 					screen = strconv.Itoa(*w.ScreenID)
 				}
+				scope := "account"
+				if w.NetworkWide {
+					scope = "network"
+				}
 				rows[i] = []string{
 					strconv.Itoa(w.ID),
 					w.Event,
 					w.URL,
 					screen,
+					scope,
 					strconv.FormatBool(w.Enabled),
 					w.LastDeliveredAt,
 				}
 			}
-			printTable(cmd, []string{"ID", "EVENT", "URL", "SCREEN", "ENABLED", "LAST DELIVERED"}, rows)
+			printTable(cmd, []string{"ID", "EVENT", "URL", "SCREEN", "SCOPE", "ENABLED", "LAST DELIVERED"}, rows)
 			return nil
 		},
 	}
@@ -180,9 +193,9 @@ func newWebhooksEventsCmd() *cobra.Command {
 			}
 			rows := make([][]string, len(resp.Events))
 			for i, e := range resp.Events {
-				rows[i] = []string{e.Name, e.Family, e.Description}
+				rows[i] = []string{e.Name, e.Family, check(e.NetworkWide), e.Description}
 			}
-			printTable(cmd, []string{"NAME", "FAMILY", "DESCRIPTION"}, rows)
+			printTable(cmd, []string{"NAME", "FAMILY", "NETWORK-WIDE", "DESCRIPTION"}, rows)
 			return nil
 		},
 	}
@@ -216,9 +229,16 @@ func newWebhooksCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create --event <name> --url <https-url>",
 		Short: "Create a webhook (response includes the secret — store it)",
+		Long: `Create a webhook. The response includes the secret, shown only now.
+
+Acting for a network, the webhook is network-wide: a screen.* event fires for every screen the
+network may manage, and --screen-id must be one of those screens.`,
 		Example: `  pintomind webhooks create \
     --event screen.offline \
-    --url "https://example.com/hooks/pintomind"`,
+    --url "https://example.com/hooks/pintomind"
+
+  # Network-wide, for all screens the network manages:
+  pintomind --network-id 7 webhooks create --event screen.offline --url https://example.com/hooks`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			body := map[string]any{
@@ -241,7 +261,7 @@ func newWebhooksCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&event, "event", "", "Event name (see 'webhooks events') (required)")
 	cmd.Flags().StringVar(&webhookURL, "url", "", "Destination URL (required)")
-	cmd.Flags().IntVar(&screenID, "screen-id", 0, "Scope to one screen (only for screen.online/screen.offline)")
+	cmd.Flags().IntVar(&screenID, "screen-id", 0, "Scope to one screen (screen.online / screen.offline only)")
 	cmd.Flags().BoolVar(&disabled, "disabled", false, "Create webhook disabled (default enabled)")
 	_ = cmd.MarkFlagRequired("event")
 	_ = cmd.MarkFlagRequired("url")

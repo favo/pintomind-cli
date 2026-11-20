@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -112,7 +113,7 @@ func newScreensDebugCmd() *cobra.Command {
 		Use:   "debug",
 		Short: "Debug a screen: posts, logs, network, elements, JavaScript and playback",
 		Long: "Runs remote console commands on a screen.\n\n" +
-			"Needs an API key with the screens:debug scope. The screen must be online and run butler 0.17.0 or newer;\n" +
+			"Needs an API key with the screens:debug scope (an OAuth login can't debug screens). The screen must be online and run butler 0.17.0 or newer;\n" +
 			"reload the screen to update it.\n\n" +
 			"Elements can be given as a CSS selector or as a path such as @1/0/2, which dom and elements print.",
 	}
@@ -142,6 +143,9 @@ func postDebug(cmd *cobra.Command, screenID, command string, body map[string]any
 	cmd.SilenceUsage = true
 	cmd.SilenceErrors = true
 
+	if activeIsOAuth(cmd) {
+		return nil, errors.New("screens debug runs code on the screen and needs an API key with the screens:debug scope; OAuth logins never get it — use a connection with such a key (--connection <name>)")
+	}
 	if body == nil {
 		body = map[string]any{}
 	}

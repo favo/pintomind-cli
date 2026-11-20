@@ -130,6 +130,9 @@ func NewScreensCmd() *cobra.Command {
 		newScreensSetChannelCmd(),
 		newScreensTempChannelCmd(),
 		newScreensDebugCmd(),
+		newScreensDeleteCmd(),
+		newScreensScheduleCmd(),
+		newScreensProvisioningCmd(),
 	)
 
 	// Device + playback actions
@@ -155,6 +158,12 @@ func NewScreensCmd() *cobra.Command {
 		newScreenActionCmd("confetti-fireworks", "Trigger confetti fireworks effect", "trigger_effect", "confetti_fireworks"),
 		newScreenActionCmd("school-parade", "Trigger school parade effect", "trigger_effect", "confetti_school_parade"),
 		newScreenActionCmd("snow", "Trigger snow effect", "trigger_effect", "snow"),
+		newScreenActionCmd("rain", "Trigger rain effect", "trigger_effect", "rain"),
+		newScreenActionCmd("thunderstorm", "Trigger thunderstorm effect", "trigger_effect", "thunderstorm"),
+		newScreenActionCmd("leaves", "Trigger falling leaves effect", "trigger_effect", "leaves"),
+		newScreenActionCmd("hearts", "Trigger hearts effect", "trigger_effect", "hearts"),
+		newScreenActionCmd("sparkles", "Trigger sparkles effect", "trigger_effect", "sparkles"),
+		newScreenActionCmd("stop-effects", "Fade out every running effect", "trigger_effect", "stop_effects"),
 	)
 
 	return cmd
@@ -184,6 +193,14 @@ func newScreenActionCmd(name, short, apiCommand, signal string) *cobra.Command {
 			if signal != "" {
 				screen["signal"] = signal
 			}
+			if hasEffectFlags(apiCommand, signal) {
+				intensity, _ := cmd.Flags().GetString("intensity")
+				if cmd.Flags().Lookup("duration") != nil {
+					duration, _ := cmd.Flags().GetInt("duration")
+					setIfChanged(cmd, screen, "duration", "duration", duration)
+				}
+				setIfChanged(cmd, screen, "intensity", "intensity", intensity)
+			}
 			body := map[string]any{"screen": screen}
 
 			label := name
@@ -203,7 +220,17 @@ func newScreenActionCmd(name, short, apiCommand, signal string) *cobra.Command {
 		},
 	}
 	addTargetFlags(cmd)
+	if hasEffectFlags(apiCommand, signal) {
+		if signal != "confetti_fire" {
+			cmd.Flags().Int("duration", 0, "Seconds the effect runs (default 15; 0 runs until stop-effects)")
+		}
+		cmd.Flags().String("intensity", "", "low, medium (default) or high")
+	}
 	return cmd
+}
+
+func hasEffectFlags(apiCommand, signal string) bool {
+	return apiCommand == "trigger_effect" && signal != "stop_effects"
 }
 
 func newScreensToggleNightModeCmd() *cobra.Command {
@@ -367,7 +394,7 @@ func newScreensConnectCmd() *cobra.Command {
 A valid code can only be used once. Optionally pass --channel-id to show a
 channel on the screen immediately, --name to name the screen (a name is
 generated otherwise), and --notes to add notes. Limited to 10 attempts per
-API key in a 10-minute window.`,
+API key or login in a 10-minute window.`,
 		Example: `  pintomind screens connect 12ABC
   pintomind screens connect 12ABC --channel-id 17
   pintomind screens connect 12ABC --channel-id 17 --name "Lobby screen" --notes "Behind the reception desk"`,

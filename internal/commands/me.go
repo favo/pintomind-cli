@@ -13,7 +13,7 @@ func NewMeCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "me",
-		Short: "Show current token identity and connection context",
+		Short: "Show who the connection is logged in as and what it acts for",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			var result map[string]any
@@ -33,9 +33,29 @@ func NewMeCmd() *cobra.Command {
 					fmt.Printf("User:    %s\n", name)
 				}
 			}
+			if network, ok := result["network"].(map[string]any); ok {
+				if name, ok := network["name"].(string); ok && name != "" {
+					fmt.Printf("Network: %s (%v", name, network["id"])
+					if role, ok := network["role"].(string); ok && role != "" {
+						fmt.Printf(", %s", role)
+					}
+					fmt.Println(")")
+				}
+			}
 			if acc, ok := result["account"].(map[string]any); ok {
 				if name, ok := acc["name"].(string); ok && name != "" {
-					fmt.Printf("Account: %s\n", name)
+					fmt.Printf("Account: %s (%v)\n", name, acc["id"])
+				}
+			}
+			if oauth, ok := result["oauth"].(map[string]any); ok {
+				if client, ok := oauth["client"].(string); ok && client != "" {
+					fmt.Printf("OAuth:   %s\n", client)
+				}
+				scopes, _ := oauth["scopes"].([]any)
+				if showScopes {
+					printOAuthScopes(scopes)
+				} else if len(scopes) > 0 {
+					fmt.Printf("Scopes:  %d (use --scopes to list)\n", len(scopes))
 				}
 			}
 			tok, _ := result["api_key"].(map[string]any)
@@ -56,6 +76,24 @@ func NewMeCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&showScopes, "scopes", false, "List scopes per resource")
 	return cmd
+}
+
+// printOAuthScopes groups "resource:action" scopes the way an API key's scopes are shown.
+func printOAuthScopes(scopes []any) {
+	grouped := map[string]any{}
+	for _, raw := range scopes {
+		scope, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		resource, action, found := strings.Cut(scope, ":")
+		if !found {
+			action = ""
+		}
+		actions, _ := grouped[resource].([]any)
+		grouped[resource] = append(actions, action)
+	}
+	printScopes(grouped)
 }
 
 func printScopes(raw any) {
@@ -91,20 +129,76 @@ func printScopes(raw any) {
 
 func NewNetworkCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "network",
-		Short: "Show network identity and stats (network token required)",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Use:   "network [network-id]",
+		Short: "Show a network's identity and member/screen stats",
+		Long: `Shows the network a network API key belongs to, or for an OAuth login: the given network, the
+one the connection acts for, or the login's only network.`,
+		Example: `  pintomind network
+  pintomind network 14`,
+		Args:        cobra.MaximumNArgs(1),
+		Annotations: map[string]string{NoAccountAnnotation: "true"},
+		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
+			client := *a.Client
+			if d, ok := a.Config.Domains[a.ActiveConnection]; ok && d.IsOAuth() {
+				id, err := networkFor(cmd, args, client.NetworkID)
+				if err != nil {
+					return err
+				}
+				client.AccountID, client.NetworkID = 0, id
+			} else if len(args) == 1 {
+				return fmt.Errorf("an API key connection shows its own network only; leave out the ID, or log in with: pintomind login")
+			}
+
 			var result map[string]any
-			if err := a.Client.Get("/network", nil, &result); err != nil {
+			if err := client.Get("/network", nil, &result); err != nil {
 				return err
 			}
 			if a.JSONOutput {
 				printJSON(result)
 				return nil
 			}
-			printJSON(result)
+			printNetworkSummary(result)
 			return nil
 		},
+	}
+}
+
+// networkFor picks the network an OAuth login asks about: the argument, the connection's
+// network, or the login's only network.
+func networkFor(cmd *cobra.Command, args []string, current int) (int, error) {
+	if len(args) == 1 {
+		return atoiArg(args[0], "network ID")
+	}
+	if current != 0 {
+		return current, nil
+	}
+	resp, err := fetchLoginChoices(cmd)
+	if err != nil {
+		return 0, err
+	}
+	switch len(resp.Networks) {
+	case 0:
+		return 0, fmt.Errorf("this login may act for no network")
+	case 1:
+		return resp.Networks[0].ID, nil
+	}
+	printNetworks(cmd, resp.Networks, 0)
+	return 0, fmt.Errorf("this login may act for several networks; pass one: pintomind network <id>")
+}
+
+func printNetworkSummary(result map[string]any) {
+	network, ok := result["network"].(map[string]any)
+	if !ok {
+		printJSON(result)
+		return
+	}
+	fmt.Printf("Network: %v (%v)\n", network["name"], network["id"])
+	stats, _ := network["stats"].(map[string]any)
+	if members, ok := stats["members"]; ok {
+		fmt.Printf("Members: %v\n", members)
+	}
+	if screens, ok := stats["screens"].(map[string]any); ok {
+		fmt.Printf("Screens: %v online, %v offline\n", screens["online"], screens["offline"])
 	}
 }

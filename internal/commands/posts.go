@@ -41,7 +41,7 @@ type PublicationsResponse struct {
 func NewPostsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "posts",
-		Short: "Manage posts and channel publications (account token required)",
+		Short: "Manage posts and channel publications (needs an account, not a network)",
 	}
 	cmd.AddCommand(newPostsListCmd())
 	cmd.AddCommand(newPostsShowCmd())
@@ -57,6 +57,10 @@ func NewPostsCmd() *cobra.Command {
 	cmd.AddCommand(createCmd)
 	cmd.AddCommand(newPostsUpdateCmd())
 	cmd.AddCommand(newPostsDeleteCmd())
+	cmd.AddCommand(newPostsArchiveCmd())
+	cmd.AddCommand(newPostsRestoreCmd())
+	cmd.AddCommand(newPostsPreviewCmd())
+	cmd.AddCommand(newPostsPlainLayoutsCmd())
 	cmd.AddCommand(newPostsPublicationsCmd())
 	cmd.AddCommand(newPostsPublishCmd())
 	cmd.AddCommand(newPostsUnpublishCmd())
