@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -11,18 +12,39 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
+type TokenSource interface {
+	Token() (string, error)
+	// Refresh replaces the access token stale after the API refused it.
+	Refresh(stale string) (string, error)
+}
+
+type staticToken string
+
+func (t staticToken) Token() (string, error) { return string(t), nil }
+
+func (t staticToken) Refresh(string) (string, error) { return "", errNoRefresh }
+
+var errNoRefresh = errors.New("token cannot be refreshed")
+
 type Client struct {
 	BaseURL    string
-	APIKey     string
+	Auth       TokenSource
+	AccountID  int
+	NetworkID  int
 	HTTPClient *http.Client
 	Verbose    bool
 }
 
 func New(baseURL, apiKey string) *Client {
+	return NewWithAuth(baseURL, staticToken(apiKey))
+}
+
+func NewWithAuth(baseURL string, auth TokenSource) *Client {
 	// Normalise: strip trailing slash, ensure https scheme
 	baseURL = strings.TrimRight(baseURL, "/")
 	if !strings.HasPrefix(baseURL, "http") {
@@ -30,63 +52,106 @@ func New(baseURL, apiKey string) *Client {
 	}
 	return &Client{
 		BaseURL: baseURL,
-		APIKey:  apiKey,
+		Auth:    auth,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
 }
 
-func (c *Client) do(method, path string, body any, out any) error {
+// send performs a request against the API, retrying once with a refreshed token on 401.
+func (c *Client) send(hc *http.Client, method, path string, body []byte, contentType string) (int, []byte, error) {
 	u := c.BaseURL + "/api/v1" + path
+	if hc == nil {
+		hc = c.HTTPClient
+	}
+	token, err := c.Auth.Token()
+	if err != nil {
+		return 0, nil, err
+	}
 
+	for attempt := 0; ; attempt++ {
+		var bodyReader io.Reader
+		if body != nil {
+			bodyReader = bytes.NewReader(body)
+		}
+		req, err := http.NewRequest(method, u, bodyReader)
+		if err != nil {
+			return 0, nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Accept", "application/json")
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
+		if c.NetworkID != 0 {
+			req.Header.Set("Network-Id", strconv.Itoa(c.NetworkID))
+		} else if c.AccountID != 0 {
+			req.Header.Set("Account-Id", strconv.Itoa(c.AccountID))
+		}
+
+		if c.Verbose {
+			fmt.Fprintf(debugWriter, "> %s %s\n", method, u)
+			if c.NetworkID != 0 {
+				fmt.Fprintf(debugWriter, "> Network-Id: %d\n", c.NetworkID)
+			} else if c.AccountID != 0 {
+				fmt.Fprintf(debugWriter, "> Account-Id: %d\n", c.AccountID)
+			}
+			if body != nil && strings.HasPrefix(contentType, "application/json") {
+				fmt.Fprintf(debugWriter, "> body: %s\n", body)
+			}
+		}
+
+		resp, err := hc.Do(req)
+		if err != nil {
+			return 0, nil, err
+		}
+		data, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if c.Verbose {
+			fmt.Fprintf(debugWriter, "< %s\n", resp.Status)
+		}
+		if err != nil {
+			return 0, nil, err
+		}
+
+		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
+			fresh, err := c.Auth.Refresh(token)
+			if errors.Is(err, errNoRefresh) {
+				return resp.StatusCode, data, nil
+			}
+			if err != nil {
+				return 0, nil, err
+			}
+			token = fresh
+			continue
+		}
+		return resp.StatusCode, data, nil
+	}
+}
+
+func (c *Client) do(method, path string, body any, out any) error {
 	var bodyBytes []byte
-	var bodyReader io.Reader
+	contentType := ""
 	if body != nil {
 		var err error
 		bodyBytes, err = json.Marshal(body)
 		if err != nil {
 			return err
 		}
-		bodyReader = bytes.NewReader(bodyBytes)
+		contentType = "application/json"
 	}
-
-	req, err := http.NewRequest(method, u, bodyReader)
+	status, data, err := c.send(nil, method, path, bodyBytes, contentType)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.APIKey)
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
+	return decodeResponse(status, data, out)
+}
 
-	if c.Verbose {
-		fmt.Fprintf(debugWriter, "> %s %s\n", method, u)
-		if bodyBytes != nil {
-			fmt.Fprintf(debugWriter, "> body: %s\n", bodyBytes)
-		}
+func decodeResponse(status int, data []byte, out any) error {
+	if status >= 400 {
+		return ResponseError(status, data)
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if c.Verbose {
-		fmt.Fprintf(debugWriter, "< %s\n", resp.Status)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode >= 400 {
-		return ResponseError(resp.StatusCode, data)
-	}
-
 	if out != nil {
 		if err := json.Unmarshal(data, out); err != nil {
 			return fmt.Errorf("decoding response: %w", err)
@@ -98,39 +163,12 @@ func (c *Client) do(method, path string, body any, out any) error {
 // DoRaw performs a raw request and returns the response body bytes.
 // Used by the `api` passthrough command.
 func (c *Client) DoRaw(method, path string, body []byte) ([]byte, int, error) {
-	u := c.BaseURL + "/api/v1" + path
-
-	var bodyReader io.Reader
+	contentType := ""
 	if body != nil {
-		bodyReader = bytes.NewReader(body)
+		contentType = "application/json"
 	}
-
-	req, err := http.NewRequest(method, u, bodyReader)
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.APIKey)
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	if c.Verbose {
-		fmt.Fprintf(debugWriter, "> %s %s\n", method, u)
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-
-	if c.Verbose {
-		fmt.Fprintf(debugWriter, "< %s\n", resp.Status)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	return data, resp.StatusCode, err
+	status, data, err := c.send(nil, method, path, body, contentType)
+	return data, status, err
 }
 
 func (c *Client) Get(path string, query url.Values, out any) error {
@@ -198,44 +236,13 @@ func (c *Client) doMultipart(method, path string, fields map[string]string, file
 		return err
 	}
 
-	u := c.BaseURL + "/api/v1" + path
-	req, err := http.NewRequest(method, u, &buf)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.APIKey)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", w.FormDataContentType())
-
-	if c.Verbose {
-		fmt.Fprintf(debugWriter, "> %s %s (multipart)\n", method, u)
-	}
-
 	uploadClient := *c.HTTPClient
 	uploadClient.Timeout = 60 * time.Second
-	resp, err := uploadClient.Do(req)
+	status, data, err := c.send(&uploadClient, method, path, buf.Bytes(), w.FormDataContentType())
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-
-	if c.Verbose {
-		fmt.Fprintf(debugWriter, "< %s\n", resp.Status)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode >= 400 {
-		return ResponseError(resp.StatusCode, data)
-	}
-	if out != nil {
-		if err := json.Unmarshal(data, out); err != nil {
-			return fmt.Errorf("decoding response: %w", err)
-		}
-	}
-	return nil
+	return decodeResponse(status, data, out)
 }
 
 // ResponseError builds the error returned for an HTTP status >= 400, including

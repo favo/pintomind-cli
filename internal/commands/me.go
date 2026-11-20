@@ -13,7 +13,7 @@ func NewMeCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "me",
-		Short: "Show current token identity and connection context",
+		Short: "Show who the connection is logged in as and what it acts for",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			var result map[string]any
@@ -33,9 +33,29 @@ func NewMeCmd() *cobra.Command {
 					fmt.Printf("User:    %s\n", name)
 				}
 			}
+			if network, ok := result["network"].(map[string]any); ok {
+				if name, ok := network["name"].(string); ok && name != "" {
+					fmt.Printf("Network: %s (%v", name, network["id"])
+					if role, ok := network["role"].(string); ok && role != "" {
+						fmt.Printf(", %s", role)
+					}
+					fmt.Println(")")
+				}
+			}
 			if acc, ok := result["account"].(map[string]any); ok {
 				if name, ok := acc["name"].(string); ok && name != "" {
-					fmt.Printf("Account: %s\n", name)
+					fmt.Printf("Account: %s (%v)\n", name, acc["id"])
+				}
+			}
+			if oauth, ok := result["oauth"].(map[string]any); ok {
+				if client, ok := oauth["client"].(string); ok && client != "" {
+					fmt.Printf("OAuth:   %s\n", client)
+				}
+				scopes, _ := oauth["scopes"].([]any)
+				if showScopes {
+					printOAuthScopes(scopes)
+				} else if len(scopes) > 0 {
+					fmt.Printf("Scopes:  %d (use --scopes to list)\n", len(scopes))
 				}
 			}
 			tok, _ := result["api_key"].(map[string]any)
@@ -55,7 +75,26 @@ func NewMeCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&showScopes, "scopes", false, "List scopes per resource")
+	cmd.AddCommand(newMeAccountsCmd())
 	return cmd
+}
+
+// printOAuthScopes groups "resource:action" scopes the way an API key's scopes are shown.
+func printOAuthScopes(scopes []any) {
+	grouped := map[string]any{}
+	for _, raw := range scopes {
+		scope, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		resource, action, found := strings.Cut(scope, ":")
+		if !found {
+			action = ""
+		}
+		actions, _ := grouped[resource].([]any)
+		grouped[resource] = append(actions, action)
+	}
+	printScopes(grouped)
 }
 
 func printScopes(raw any) {
@@ -92,7 +131,7 @@ func printScopes(raw any) {
 func NewNetworkCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "network",
-		Short: "Show network identity and stats (network token required)",
+		Short: "Show network identity and stats (network API key or a connection acting for a network)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
 			var result map[string]any
