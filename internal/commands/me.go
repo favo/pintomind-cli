@@ -75,7 +75,6 @@ func NewMeCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&showScopes, "scopes", false, "List scopes per resource")
-	cmd.AddCommand(newMeAccountsCmd())
 	return cmd
 }
 

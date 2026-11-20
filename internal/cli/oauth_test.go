@@ -81,8 +81,8 @@ func TestOAuthConnectionNeedsAnAccount(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "use-account") {
 		t.Fatalf("err = %v, want a hint to choose an account", err)
 	}
-	if err := run("me", "accounts"); err != nil {
-		t.Fatalf("me accounts must work without an account: %v", err)
+	if err := run("accounts"); err != nil {
+		t.Fatalf("accounts must work without an account: %v", err)
 	}
 }
 

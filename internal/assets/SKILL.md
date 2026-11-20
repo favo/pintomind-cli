@@ -36,7 +36,7 @@ An OAuth login belongs to the user, not to one account. Each OAuth connection ac
 (requests send `Account-Id`) or one network (`Network-Id`), chosen after login:
 
 ```bash
-pintomind me accounts                       # accounts and networks the login may act for
+pintomind accounts                          # accounts and networks the login may act for
 pintomind connection use-account <id>       # act for an account (no ID: pick interactively)
 pintomind connection use-network <id>       # act for a network
 pintomind --network-id 7 webhooks list      # override for one command (also --account-id)
@@ -44,9 +44,9 @@ pintomind --network-id 7 webhooks list      # override for one command (also --a
 
 Acting for a network reaches what a network API key reaches: screens of members that let the
 network manage them (all screens for some network roles), and network-wide webhooks. Changing
-anything needs a role that may manage the network ("CAN WRITE" in `me accounts`). Endpoints that
+anything needs a role that may manage the network ("CAN WRITE" in `accounts`). Endpoints that
 need an account (posts, media, …) answer 403 for a network connection; switch with `use-account`.
-If an account needs SSO, `me accounts` says so: log in again through that SSO.
+If an account needs SSO, `accounts` says so: log in again through that SSO.
 
 ## Global Flags
 
@@ -890,7 +890,7 @@ and `--screen-id` must be one of those screens.
 ```bash
 pintomind me                 # user, account or network, OAuth client or API key
 pintomind me --scopes
-pintomind me accounts        # OAuth: accounts and networks the login may act for
+pintomind accounts           # OAuth: accounts and networks the login may act for
 pintomind network            # network identity (network API key, or a connection acting for a network)
 ```
 

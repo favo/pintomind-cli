@@ -217,7 +217,7 @@ func newUseAccountCmd(network bool) *cobra.Command {
 		Short: "Make an OAuth connection act for another " + kind + " (asks when no ID is given)",
 		Long: "Switches what an OAuth connection acts for without logging in again. Requests then send\n" +
 			"the " + map[bool]string{false: "Account-Id", true: "Network-Id"}[network] + " header instead of the " + other + "'s. " +
-			"The choices are listed by 'pintomind me accounts'.",
+			"The choices are listed by 'pintomind accounts'.",
 		Example: "  pintomind connection use-" + kind + " 42\n  pintomind connection use-" + kind + " --connection develop",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

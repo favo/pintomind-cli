@@ -43,7 +43,7 @@ func fetchMeAccounts(client *api.Client) (*MeAccountsResponse, error) {
 	return &resp, nil
 }
 
-func newMeAccountsCmd() *cobra.Command {
+func NewAccountsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:         "accounts",
 		Short:       "List the accounts and networks a login may act for (OAuth connections)",
@@ -129,7 +129,7 @@ func findAccount(resp *MeAccountsResponse, id int) (accountChoice, error) {
 			return accountChoice{id: acc.ID, name: acc.Name}, nil
 		}
 	}
-	return accountChoice{}, fmt.Errorf("account %d is not one this login may act for (see: pintomind me accounts)", id)
+	return accountChoice{}, fmt.Errorf("account %d is not one this login may act for (see: pintomind accounts)", id)
 }
 
 func findNetwork(resp *MeAccountsResponse, id int) (accountChoice, error) {
@@ -144,7 +144,7 @@ func findNetwork(resp *MeAccountsResponse, id int) (accountChoice, error) {
 			return accountChoice{network: true, id: n.ID, name: n.Name}, nil
 		}
 	}
-	return accountChoice{}, fmt.Errorf("network %d is not one this login may act for (see: pintomind me accounts)", id)
+	return accountChoice{}, fmt.Errorf("network %d is not one this login may act for (see: pintomind accounts)", id)
 }
 
 var errNoChoice = errors.New("no account chosen")

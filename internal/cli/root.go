@@ -134,6 +134,7 @@ func NewRootCmd() *cobra.Command {
 	addAPI(commands.NewTasksCmd())
 	addAPI(commands.NewSchemasCmd())
 	addAPI(commands.NewMeCmd())
+	addAPI(commands.NewAccountsCmd())
 	addAPI(commands.NewNetworkCmd())
 	addAPI(commands.NewAPICmd())
 
