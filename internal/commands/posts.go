@@ -60,6 +60,7 @@ func NewPostsCmd() *cobra.Command {
 	cmd.AddCommand(newPostsArchiveCmd())
 	cmd.AddCommand(newPostsRestoreCmd())
 	cmd.AddCommand(newPostsPreviewCmd())
+	cmd.AddCommand(newPostsPlainLayoutsCmd())
 	cmd.AddCommand(newPostsPublicationsCmd())
 	cmd.AddCommand(newPostsPublishCmd())
 	cmd.AddCommand(newPostsUnpublishCmd())
