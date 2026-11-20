@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -176,6 +178,36 @@ func TestLoginRefusesWrongStateAndIssuer(t *testing.T) {
 				t.Fatal("expected an error")
 			}
 		})
+	}
+}
+
+func TestLoginCancelledInBrowser(t *testing.T) {
+	f := newFakeServer(t)
+	pages := make(chan string, 1)
+	_, err := Login(context.Background(), LoginOptions{
+		BaseURL: f.URL, ClientID: f.clientID, NoBrowser: true,
+		Prompt: func(authorizeURL string) {
+			u, _ := url.Parse(authorizeURL)
+			q := u.Query()
+			go func() {
+				resp, err := http.Get(q.Get("redirect_uri") + "?" + url.Values{
+					"error": {"access_denied"}, "state": {q.Get("state")}, "iss": {f.URL},
+				}.Encode())
+				if err != nil {
+					pages <- err.Error()
+					return
+				}
+				body, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				pages <- string(body)
+			}()
+		},
+	})
+	if !errors.Is(err, ErrLoginCancelled) {
+		t.Fatalf("err = %v, want ErrLoginCancelled", err)
+	}
+	if page := <-pages; !strings.Contains(page, "Login cancelled") {
+		t.Fatalf("browser page = %q", page)
 	}
 }
 

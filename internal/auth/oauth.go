@@ -25,6 +25,9 @@ import (
 // password changed. Only a new login helps.
 var ErrLoginGone = errors.New("the login has expired or was revoked")
 
+// ErrLoginCancelled means the user chose not to log in on the confirm page (access_denied).
+var ErrLoginCancelled = errors.New("login cancelled in the browser — nothing was saved; run pintomind login again to retry")
+
 type Metadata struct {
 	Issuer                string `json:"issuer"`
 	AuthorizationEndpoint string `json:"authorization_endpoint"`
@@ -194,6 +197,8 @@ func callbackHandler(state string, meta *Metadata, results chan<- callbackResult
 		case q.Get("iss") != "" && q.Get("iss") != meta.Issuer,
 			q.Get("iss") == "" && meta.IssParameterSupported:
 			result.err = fmt.Errorf("the login redirect came from issuer %q, expected %q", q.Get("iss"), meta.Issuer)
+		case q.Get("error") == "access_denied":
+			result.err = ErrLoginCancelled
 		case q.Get("error") != "":
 			result.err = fmt.Errorf("login refused: %s", describeOAuthError(q.Get("error"), q.Get("error_description")))
 		case q.Get("code") == "":
@@ -204,7 +209,10 @@ func callbackHandler(state string, meta *Metadata, results chan<- callbackResult
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		message := "You are logged in to the Pintomind CLI. You can close this window."
-		if result.err != nil {
+		switch {
+		case errors.Is(result.err, ErrLoginCancelled):
+			message = "Login cancelled. Nothing was saved; you can close this window."
+		case result.err != nil:
 			w.WriteHeader(http.StatusBadRequest)
 			message = "Login failed: " + result.err.Error()
 		}

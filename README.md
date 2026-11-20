@@ -73,7 +73,7 @@ pintomind login --network 7                            # act for network 7 witho
 pintomind login --no-browser                           # print the login URL instead of opening it
 ```
 
-`login` opens the browser on the server's login page (SSO included) and waits for it to send you back to the CLI on `http://127.0.0.1:<random port>/callback`, using the authorization code flow with PKCE. The connection is named after the host unless you pass `--name`; logging in again with the same name renews the login.
+`login` opens the browser on the server's login page (SSO included). After logging in, the browser asks you to confirm that the Pintomind CLI may log in to your user; choose **Logg inn** to go on or **Avbryt** to cancel, which saves nothing. The browser then sends you back to the CLI on `http://127.0.0.1:<random port>/callback` (authorization code flow with PKCE). The connection is named after the host unless you pass `--name`; logging in again with the same name renews the login.
 
 - **Tokens** are kept in the OS keychain (macOS Keychain, Secret Service on Linux, Windows Credential Manager). Without one they go in `config.json`, readable only by you (mode 0600). `connection show` says which.
 - **Refreshing** is automatic: an expired access token, or a 401 from the API, refreshes the login. Parallel `pintomind` processes share one refresh lock, so a rotated refresh token is never sent twice (which would revoke the login). A login lasts as long as it is used; after 90 days without use, or when it is revoked elsewhere, run `pintomind login` again.

@@ -27,7 +27,8 @@ pintomind connection show                             # active connection detail
 ```
 
 `pintomind login` needs a browser on the same machine (it listens on 127.0.0.1 for the redirect);
-over SSH, use an API key. If the CLI knows no OAuth client for a host it asks for `--client-id`.
+over SSH, use an API key. After logging in, the user confirms the Pintomind CLI in the browser
+("Logg inn"); "Avbryt" cancels and the CLI reports the login as cancelled, saving nothing. If the CLI knows no OAuth client for a host it asks for `--client-id`.
 
 ### Accounts and networks (OAuth connections)
 

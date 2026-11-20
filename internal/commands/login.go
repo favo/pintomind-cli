@@ -23,8 +23,8 @@ func NewLoginCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Log in with your user in the browser (OAuth) and add or renew a connection",
-		Long: `Opens the browser on the server's login page and waits for it to send you back to the
-CLI on 127.0.0.1. The login belongs to your user: afterwards you choose which account or network
+		Long: `Opens the browser on the server's login page. After logging in you confirm that the
+Pintomind CLI may log in (or cancel), and the browser sends you back to the CLI on 127.0.0.1. The login belongs to your user: afterwards you choose which account or network
 the connection acts for, and can switch later with 'connection use-account' / 'use-network'.
 
 The tokens go in the OS keychain when one is available, else in the config file (mode 0600).
@@ -80,7 +80,7 @@ API key connections ('connection add') keep working alongside.`,
 				ClientID:  clientID,
 				NoBrowser: noBrowser,
 				Prompt: func(authorizeURL string) {
-					fmt.Fprintf(os.Stderr, "Log in to %s in the browser. If it doesn't open, visit:\n\n  %s\n\nWaiting for the login…\n", baseURL, authorizeURL)
+					fmt.Fprintf(os.Stderr, "Log in to %s in the browser and confirm the Pintomind CLI there. If it doesn't open, visit:\n\n  %s\n\nWaiting for the login…\n", baseURL, authorizeURL)
 				},
 			})
 			if err != nil {
