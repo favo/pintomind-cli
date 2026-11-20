@@ -25,7 +25,7 @@ type PosterTemplatesResponse struct {
 func NewPosterTemplatesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "poster-templates",
-		Short: "List poster templates shared via content networks (account token required)",
+		Short: "List poster templates shared via content networks (needs an account, not a network)",
 	}
 	cmd.AddCommand(newPosterTemplatesListCmd())
 	cmd.AddCommand(newPosterTemplatesShowCmd())

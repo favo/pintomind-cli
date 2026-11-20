@@ -168,3 +168,30 @@ func TestClientWithAPIKeyDoesNotRetry401(t *testing.T) {
 		t.Fatalf("err = %v, calls = %d", err, calls)
 	}
 }
+
+func TestForbiddenHints(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body      string
+		networkID int
+		want      string
+	}{
+		"network on an account endpoint": {`{"error":"Access denied: This endpoint requires an account-bearer API key"}`, 14, "acts for network 14"},
+		"sso":                            {`{"error":"This account requires single sign-on (SSO): connect again"}`, 0, "pintomind login"},
+		"other":                          {`{"error":"forbidden"}`, 14, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			client := newTestClient(http.StatusForbidden, tc.body)
+			client.NetworkID = tc.networkID
+			err := client.Get("/posts", nil, nil)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if tc.want == "" && strings.Contains(err.Error(), "\n") {
+				t.Fatalf("unexpected hint: %q", err)
+			}
+			if tc.want != "" && !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err = %q, want hint %q", err, tc.want)
+			}
+		})
+	}
+}

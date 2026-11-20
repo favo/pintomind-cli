@@ -159,7 +159,7 @@ pintomind screens temp-channel <screen-id> <channel-id> --toggle
 ### Remote debugging
 
 `screens debug` runs remote console commands on a single screen. It needs an API key with the
-`screens:debug` scope, and the screen must be online and run butler 0.17.0 or newer (reload the
+`screens:debug` scope (an OAuth login never gets it; use `--connection <api-key-connection>`), and the screen must be online and run butler 0.17.0 or newer (reload the
 screen to update it). Elements are given as a CSS selector or as a path such as `@1/0/2`, which
 `dom` and `elements` print. Add `--json` for the screen's raw answer.
 

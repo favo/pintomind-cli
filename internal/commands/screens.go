@@ -394,7 +394,7 @@ func newScreensConnectCmd() *cobra.Command {
 A valid code can only be used once. Optionally pass --channel-id to show a
 channel on the screen immediately, --name to name the screen (a name is
 generated otherwise), and --notes to add notes. Limited to 10 attempts per
-API key in a 10-minute window.`,
+API key or login in a 10-minute window.`,
 		Example: `  pintomind screens connect 12ABC
   pintomind screens connect 12ABC --channel-id 17
   pintomind screens connect 12ABC --channel-id 17 --name "Lobby screen" --notes "Behind the reception desk"`,

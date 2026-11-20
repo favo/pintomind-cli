@@ -18,12 +18,17 @@ The path should start with / and is relative to /api/v1.
 Pass a JSON body via stdin for POST/PATCH requests.
 
 The response body is always printed; the command exits non-zero when the
-server answers with an HTTP status of 400 or above.`,
+server answers with an HTTP status of 400 or above.
+
+On an OAuth connection the request carries the connection's Account-Id or
+Network-Id (or --account-id / --network-id), and none before one is chosen,
+as GET /me/accounts expects.`,
 		Example: `  pintomind api /screens
   pintomind api /screens/42
   pintomind api GET /channels?sort_by=name
   echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42`,
-		Args: cobra.RangeArgs(1, 2),
+		Args:        cobra.RangeArgs(1, 2),
+		Annotations: map[string]string{NoAccountAnnotation: "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
 

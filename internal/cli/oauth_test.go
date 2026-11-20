@@ -179,3 +179,31 @@ func TestNetworkCommandPicksTheNetworkForOAuth(t *testing.T) {
 		t.Fatalf("networks on an API key: %v", err)
 	}
 }
+
+func TestOAuthEdgeCases(t *testing.T) {
+	server, requests := newFakeAPI(t)
+	setupOAuthConnection(t, server.URL)
+
+	if err := run("api", "/me/accounts"); err != nil {
+		t.Fatalf("api passthrough before an account is chosen: %v", err)
+	}
+	if got := requests(); len(got) != 1 || got[0].accountID != "" || got[0].networkID != "" {
+		t.Fatalf("api passthrough requests = %+v", got)
+	}
+
+	if err := run("connection", "add", "dev", "sk-new"); err == nil || !strings.Contains(err.Error(), "OAuth login") {
+		t.Fatalf("connection add over an OAuth connection: %v", err)
+	}
+	cfg, _ := config.Load()
+	if !cfg.Domains["dev"].IsOAuth() {
+		t.Fatal("connection add replaced the OAuth connection")
+	}
+
+	err := run("--account-id", "3", "screens", "debug", "status", "42")
+	if err == nil || !strings.Contains(err.Error(), "screens:debug") {
+		t.Fatalf("screens debug on OAuth: %v", err)
+	}
+	if got := requests(); len(got) != 0 {
+		t.Fatalf("screens debug must not call the API on OAuth: %+v", got)
+	}
+}

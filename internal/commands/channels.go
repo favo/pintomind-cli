@@ -135,7 +135,7 @@ func newChannelsPostsCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "posts <channel-id>",
-		Short: "List posts in a channel (account token required)",
+		Short: "List posts in a channel (needs an account, not a network)",
 		Example: `  pintomind channels posts 7
   pintomind channels posts 7 --visible                 # currently visible only
   pintomind channels posts 7 --hidden                  # currently hidden only

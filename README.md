@@ -162,7 +162,9 @@ pintomind me        # Connection: env
 
 `PINTOMIND_API_URL` is optional and defaults to `https://app.infoskjermen.no`;
 set it to target another endpoint. An explicit `--connection` flag always takes
-precedence over the env vars.
+precedence over the env vars. The env vars take only an API key: an OAuth login
+needs the stored connection, so pass `--connection` (or unset `PINTOMIND_API_KEY`)
+to use one.
 
 ---
 
@@ -329,7 +331,7 @@ pintomind screens temp-channel <screen-id> <channel-id> --toggle
 **Debug a screen:**
 
 Runs remote console commands on a screen. Needs an API key with the `screens:debug` scope (not ticked by default
-on new keys) and a screen that is online with butler 0.17.0 or newer; reload the screen to update it. Elements can be
+on new keys; an OAuth login never gets it) and a screen that is online with butler 0.17.0 or newer; reload the screen to update it. Elements can be
 given as a CSS selector or as a path such as `@1/1/2`, which `dom` and `elements` print. Every command supports `--json`.
 
 ```bash

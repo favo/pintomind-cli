@@ -46,6 +46,10 @@ func newConfigAddCmd() *cobra.Command {
 				return err
 			}
 
+			if existing, ok := cfg.Domains[name]; ok && existing.IsOAuth() {
+				return fmt.Errorf("connection %q is an OAuth login; remove it first (pintomind connection remove %s) or pick another name", name, name)
+			}
+
 			url := baseURL
 			if url == "" {
 				url = "https://" + name

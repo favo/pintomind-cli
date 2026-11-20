@@ -145,12 +145,12 @@ func (c *Client) do(method, path string, body any, out any) error {
 	if err != nil {
 		return err
 	}
-	return decodeResponse(status, data, out)
+	return c.decodeResponse(status, data, out)
 }
 
-func decodeResponse(status int, data []byte, out any) error {
+func (c *Client) decodeResponse(status int, data []byte, out any) error {
 	if status >= 400 {
-		return ResponseError(status, data)
+		return c.withHint(ResponseError(status, data), status)
 	}
 	if out != nil {
 		if err := json.Unmarshal(data, out); err != nil {
@@ -242,7 +242,22 @@ func (c *Client) doMultipart(method, path string, fields map[string]string, file
 	if err != nil {
 		return err
 	}
-	return decodeResponse(status, data, out)
+	return c.decodeResponse(status, data, out)
+}
+
+// withHint says what to do about a 403 that comes from what the connection acts for.
+func (c *Client) withHint(err error, status int) error {
+	if status != http.StatusForbidden {
+		return err
+	}
+	message := strings.ToLower(err.Error())
+	switch {
+	case c.NetworkID != 0 && strings.Contains(message, "account-bearer"):
+		return fmt.Errorf("%w\nThe connection acts for network %d, and this needs an account: pass --account-id <id> or run 'pintomind connection use-account'", err, c.NetworkID)
+	case strings.Contains(message, "single sign-on"):
+		return fmt.Errorf("%w\nRun 'pintomind login' and log in through the account's SSO on the login page", err)
+	}
+	return err
 }
 
 // ResponseError builds the error returned for an HTTP status >= 400, including

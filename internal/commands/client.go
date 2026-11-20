@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"github.com/spf13/cobra"
+
 	"favo/pintomind-cli/internal/api"
 	"favo/pintomind-cli/internal/auth"
 	"favo/pintomind-cli/internal/config"
@@ -28,3 +30,9 @@ func newUnscopedClient(name string, d config.Domain, verbose bool) *api.Client {
 }
 
 const NoAccountAnnotation = "pintomind/no-account"
+
+func activeIsOAuth(cmd *cobra.Command) bool {
+	a := app(cmd)
+	d, ok := a.Config.Domains[a.ActiveConnection]
+	return ok && d.IsOAuth()
+}
