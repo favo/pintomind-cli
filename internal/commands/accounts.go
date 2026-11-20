@@ -235,7 +235,7 @@ func pickAccount(resp *MeAccountsResponse, current config.Domain, kind string) (
 
 	var choice accountChoice
 	err := huh.NewForm(huh.NewGroup(
-		huh.NewSelect[accountChoice]().Title("Act for which "+what+"?").Options(options...).Value(&choice),
+		huh.NewSelect[accountChoice]().Title("Act for which " + what + "?").Options(options...).Value(&choice),
 	)).Run()
 	return choice, err
 }
