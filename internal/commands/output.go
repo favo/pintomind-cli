@@ -104,7 +104,9 @@ func printTable(cmd *cobra.Command, headers []string, rows [][]string) {
 	}
 	separator := make([]string, len(headers))
 	for i, n := range widths {
-		separator[i] = strings.Repeat("-", n)
+		if headers[i] != "" {
+			separator[i] = strings.Repeat("-", n)
+		}
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
