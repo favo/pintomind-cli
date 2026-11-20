@@ -45,7 +45,8 @@ func NewWebhooksCmd() *cobra.Command {
 
 A connection acting for a network (pintomind connection use-network, or --network-id) manages
 the network's network-wide webhooks: a screen.* webhook created that way fires for every screen
-the network may manage, and its payload's screen.account_id names the screen's account.`,
+the network may manage. Deliveries are batched over 30 s with a screens list (at most 500 per
+delivery) whose entries carry the screen's account_id and occurred_at.`,
 	}
 	cmd.AddCommand(newWebhooksListCmd())
 	cmd.AddCommand(newWebhooksEventsCmd())

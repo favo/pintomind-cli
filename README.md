@@ -849,7 +849,7 @@ pintomind webhooks deliveries <id>
 pintomind webhooks delete <id>
 ```
 
-The secret is shown only in the create response. **Network-wide webhooks:** with a connection acting for a network (`connection use-network`, or `--network-id`), webhooks are the network's own. A `screen.online`, `screen.offline`, `screen.paired` or `screen.unpaired` webhook created that way fires for every screen the network may manage, including member accounts that join later; the payload's `screen.account_id` names the screen's account.
+The secret is shown only in the create response. **Network-wide webhooks:** with a connection acting for a network (`connection use-network`, or `--network-id`), webhooks are the network's own. A `screen.online`, `screen.offline`, `screen.paired` or `screen.unpaired` webhook created that way fires for every screen the network may manage, including member accounts that join later. Deliveries are batched: events are collected for 30 seconds and sent together with a `screens` list instead of `screen` (at most 500 per delivery), each entry with the screen's `account_id` and its own `occurred_at`. A test delivery uses the same shape.
 
 ```bash
 pintomind --network-id 7 webhooks create --event screen.offline --url https://example.com/hook

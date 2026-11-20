@@ -926,4 +926,4 @@ echo '{"screen":{"command":"reload"}}' | pintomind api PATCH /screens/42
 - Use `--connection develop` to target the dev environment without changing your default.
 - Token scopes matter: `channels:read:stats` is required for stats endpoints; account tokens (not network tokens or connections acting for a network) are required for posts and channel posts.
 - A 401 on an OAuth connection is retried after a token refresh; "login has expired or was revoked" means: `pintomind login --name <connection>`.
-- Network webhooks: `pintomind --network-id <id> webhooks create --event screen.offline --url https://…` creates a network-wide webhook firing for every screen the network manages (payload `screen.account_id` names the account).
+- Network webhooks: `pintomind --network-id <id> webhooks create --event screen.offline --url https://…` creates a network-wide webhook firing for every screen the network manages (deliveries are batched over 30 s with a `screens` list instead of `screen`, at most 500 per delivery; each entry has `account_id` and `occurred_at`).
