@@ -81,8 +81,10 @@ func TestOAuthConnectionNeedsAnAccount(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "use-account") {
 		t.Fatalf("err = %v, want a hint to choose an account", err)
 	}
-	if err := run("accounts"); err != nil {
-		t.Fatalf("accounts must work without an account: %v", err)
+	for _, cmd := range []string{"accounts", "networks"} {
+		if err := run(cmd); err != nil {
+			t.Fatalf("%s must work without an account: %v", cmd, err)
+		}
 	}
 }
 
@@ -143,5 +145,37 @@ func TestAPIKeyConnectionSendsNoAccountHeaders(t *testing.T) {
 	got := requests()
 	if len(got) != 1 || got[0].auth != "Bearer sk-key" || got[0].accountID != "" || got[0].networkID != "" {
 		t.Fatalf("requests = %+v", got)
+	}
+}
+
+func TestNetworkCommandPicksTheNetworkForOAuth(t *testing.T) {
+	server, requests := newFakeAPI(t)
+	setupOAuthConnection(t, server.URL)
+	if err := run("connection", "use-account", "3"); err != nil {
+		t.Fatal(err)
+	}
+	requests()
+
+	if err := run("network"); err != nil {
+		t.Fatal(err)
+	}
+	got := requests()
+	last := got[len(got)-1]
+	if last.path != "/api/v1/network" || last.networkID != "7" || last.accountID != "" {
+		t.Fatalf("network with the login's only network: %+v", got)
+	}
+
+	if err := run("network", "9"); err != nil {
+		t.Fatal(err)
+	}
+	if got := requests(); len(got) != 1 || got[0].networkID != "9" {
+		t.Fatalf("network 9: %+v", got)
+	}
+
+	if err := run("--connection", "key", "network", "9"); err == nil || !strings.Contains(err.Error(), "API key") {
+		t.Fatalf("API key with a network ID: %v", err)
+	}
+	if err := run("--connection", "key", "networks"); err == nil || !strings.Contains(err.Error(), "API key") {
+		t.Fatalf("networks on an API key: %v", err)
 	}
 }

@@ -46,25 +46,73 @@ func fetchMeAccounts(client *api.Client) (*MeAccountsResponse, error) {
 func NewAccountsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:         "accounts",
-		Short:       "List the accounts and networks a login may act for (OAuth connections)",
+		Short:       "List the accounts a login may act for (OAuth connections; switch with connection use-account)",
+		Args:        cobra.NoArgs,
 		Annotations: map[string]string{NoAccountAnnotation: "true"},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
-			client := *a.Client
-			client.AccountID, client.NetworkID = 0, 0
-			resp, err := fetchMeAccounts(&client)
+			resp, err := fetchLoginChoices(cmd)
 			if err != nil {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printJSON(map[string]any{"accounts": resp.Accounts})
 				return nil
 			}
 			d := a.Config.Domains[a.ActiveConnection]
-			printAccountChoices(cmd, resp, d)
+			rows := make([][]string, len(resp.Accounts))
+			for i, acc := range resp.Accounts {
+				rows[i] = []string{marker(d.NetworkID == 0 && d.AccountID == acc.ID), strconv.Itoa(acc.ID), acc.Name, acc.Role, ssoNote(acc.SSOLoginNeeded)}
+			}
+			printTable(cmd, []string{"", "ID", "NAME", "ROLE", "SSO"}, rows)
 			return nil
 		},
 	}
+}
+
+func NewNetworksCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:         "networks",
+		Short:       "List the networks a login may act for (OAuth connections; switch with connection use-network)",
+		Args:        cobra.NoArgs,
+		Annotations: map[string]string{NoAccountAnnotation: "true"},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a := app(cmd)
+			resp, err := fetchLoginChoices(cmd)
+			if err != nil {
+				return err
+			}
+			if a.JSONOutput {
+				printJSON(map[string]any{"networks": resp.Networks})
+				return nil
+			}
+			if len(resp.Networks) == 0 {
+				fmt.Println("This login may act for no network.")
+				return nil
+			}
+			printNetworks(cmd, resp.Networks, a.Config.Domains[a.ActiveConnection].NetworkID)
+			return nil
+		},
+	}
+}
+
+func printNetworks(cmd *cobra.Command, networks []MeNetwork, current int) {
+	rows := make([][]string, len(networks))
+	for i, n := range networks {
+		rows[i] = []string{marker(current == n.ID), strconv.Itoa(n.ID), n.Name, n.Role, strconv.Itoa(n.AccountID), yesNo(n.CanManage), ssoNote(n.SSOLoginNeeded)}
+	}
+	printTable(cmd, []string{"", "ID", "NAME", "ROLE", "ACCOUNT", "CAN WRITE", "SSO"}, rows)
+}
+
+// fetchLoginChoices lists what the active OAuth login may act for, asking as no account.
+func fetchLoginChoices(cmd *cobra.Command) (*MeAccountsResponse, error) {
+	a := app(cmd)
+	if d, ok := a.Config.Domains[a.ActiveConnection]; !ok || !d.IsOAuth() {
+		return nil, fmt.Errorf("connection %q uses an API key, which acts for its own account or network only; log in with: pintomind login", a.ActiveConnection)
+	}
+	client := *a.Client
+	client.AccountID, client.NetworkID = 0, 0
+	return fetchMeAccounts(&client)
 }
 
 func printAccountChoices(cmd *cobra.Command, resp *MeAccountsResponse, current config.Domain) {
@@ -144,7 +192,7 @@ func findNetwork(resp *MeAccountsResponse, id int) (accountChoice, error) {
 			return accountChoice{network: true, id: n.ID, name: n.Name}, nil
 		}
 	}
-	return accountChoice{}, fmt.Errorf("network %d is not one this login may act for (see: pintomind accounts)", id)
+	return accountChoice{}, fmt.Errorf("network %d is not one this login may act for (see: pintomind networks)", id)
 }
 
 var errNoChoice = errors.New("no account chosen")

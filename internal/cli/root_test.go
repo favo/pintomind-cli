@@ -28,7 +28,7 @@ func TestIsUpdateCmdOnlyMatchesTopLevelUpdate(t *testing.T) {
 func TestNewCommandsAreRegistered(t *testing.T) {
 	root := NewRootCmd()
 	for _, path := range []string{
-		"login", "logout", "connection use-account", "connection use-network", "accounts",
+		"login", "logout", "connection use-account", "connection use-network", "accounts", "networks", "network",
 		"channels create", "channels update", "channels delete", "channels move-post", "channels preview",
 		"channels search", "channels layouts", "channels sharing show", "channels sharing start",
 		"channels sharing update", "channels sharing stop", "channels sharing codes add",

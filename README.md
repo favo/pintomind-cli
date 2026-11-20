@@ -92,7 +92,8 @@ pintomind logout --connection develop
 A login belongs to your user, not to one account. Each OAuth connection acts for **one account** (requests carry `Account-Id`) **or one network** (`Network-Id`). `login` asks which after logging in (or picks your only account); switch later without logging in again:
 
 ```bash
-pintomind accounts                         # accounts and networks your login may act for
+pintomind accounts                         # accounts your login may act for
+pintomind networks                         # networks your login may act for
 pintomind connection use-account 123       # act for an account
 pintomind connection use-network 7         # act for a network
 pintomind connection use-account           # no ID: pick from a list
@@ -100,7 +101,7 @@ pintomind --network-id 7 screens list      # another account or network for one 
 pintomind --account-id 123 posts list
 ```
 
-Acting for a network reaches what a network API key reaches: the screens of member accounts that let the network manage them (every account for some network roles) and the network's network-wide webhooks. Your role in the network's account decides: reading needs a role that may view the network, changes need one that may manage it (`CAN WRITE` in `accounts`). Endpoints that need an account, such as posts and media, refuse a network connection. If an account requires SSO, `accounts` says so; log in again through that SSO.
+Acting for a network reaches what a network API key reaches: the screens of member accounts that let the network manage them (every account for some network roles) and the network's network-wide webhooks. Your role in the network's account decides: reading needs a role that may view the network, changes need one that may manage it (`CAN WRITE` in `networks`). Endpoints that need an account, such as posts and media, refuse a network connection. If an account requires SSO, `accounts` or `networks` says so; log in again through that SSO.
 
 ### Add a connection with an API key
 
@@ -205,8 +206,10 @@ Uploads the file, waits for processing, creates the post, and publishes it. Use 
 ```bash
 pintomind me           # Show user, account or network, and the OAuth client or API key
 pintomind me --scopes  # ...with the scopes
-pintomind accounts     # OAuth: accounts and networks the login may act for
-pintomind network      # Show network identity and stats (network API key, or a connection acting for a network)
+pintomind accounts     # OAuth: accounts the login may act for
+pintomind networks     # OAuth: networks the login may act for
+pintomind network      # Network identity and member/screen stats
+pintomind network 14   # OAuth: a given network (default: the one the connection acts for, or your only one)
 ```
 
 ### Screens
