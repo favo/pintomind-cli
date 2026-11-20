@@ -32,6 +32,14 @@ func NewChannelsCmd() *cobra.Command {
 	cmd.AddCommand(newChannelsPostsCmd())
 	cmd.AddCommand(newChannelsStatsCmd())
 	cmd.AddCommand(newChannelsSetThemeCmd())
+	cmd.AddCommand(newChannelsCreateCmd())
+	cmd.AddCommand(newChannelsUpdateCmd())
+	cmd.AddCommand(newChannelsDeleteCmd())
+	cmd.AddCommand(newChannelsMovePostCmd())
+	cmd.AddCommand(newChannelsPreviewCmd())
+	cmd.AddCommand(newChannelsSearchCmd())
+	cmd.AddCommand(newChannelsLayoutsCmd())
+	cmd.AddCommand(newChannelsSharingCmd())
 	return cmd
 }
 
