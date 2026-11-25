@@ -837,6 +837,23 @@ pintomind unsplash forest --page 2    # media_box.photo_id (credit the photograp
 pintomind giphy party --offset 25     # media_box.gif_id ("Powered by GIPHY")
 ```
 
+### Integrations
+
+Integrations (calendars, social media, Microsoft 365 …) and the resources made from them. Connecting a new one goes through the provider's login in the web app or the Go app.
+
+```bash
+pintomind integrations list
+pintomind integrations types                    # what the account may connect
+pintomind integrations show <id>                # with the resources made from it
+pintomind integrations available <id>           # what the provider offers, numbered
+pintomind integrations available <id> --group-id <workspace>   # Power BI: one workspace at a time
+pintomind integrations add-resource <id> 3      # make a resource from offer number 3
+pintomind integrations remove-resource <id> <resource-id>
+pintomind integrations delete <id> [--with-resources]
+```
+
+A resource used in posts or shared with the network is not deleted; the error says why. An integration with resources is only deleted with `--with-resources`, which deletes them too.
+
 ### Webhooks
 
 ```bash

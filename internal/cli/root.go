@@ -130,6 +130,7 @@ func NewRootCmd() *cobra.Command {
 	addAPI(commands.NewEmojisCmd())
 	addAPI(commands.NewUnsplashCmd())
 	addAPI(commands.NewGiphyCmd())
+	addAPI(commands.NewIntegrationsCmd())
 	addAPI(commands.NewWebhooksCmd())
 	addAPI(commands.NewTasksCmd())
 	addAPI(commands.NewSchemasCmd())
