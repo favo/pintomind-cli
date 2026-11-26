@@ -131,7 +131,7 @@ inside that theme area.
 | `calendar_extension` | theme, area | `header_background_color`, `header_text_color`, `contrast_color`, `contrast_opacity`, `contrast_text_color` | calendar header and events |
 | `clock_extension` | theme, area | `time_color`, `date_color`, `delimiter_color`, `second_hand_color`, `widget_*_color` | clocks, world clock, clock widgets |
 | `counter_extension` | theme, area | `counter_color`, `text_color`, `marker_color` | countdowns and counters |
-| `forecast_extension` | theme, area | `icon_type` (`duotone` or `themed`), `icon_color`, `inner_sun_color`, `outer_sun_color`, `raindrop_color`, `moon_color` | weather icons |
+| `forecast_extension` | theme, area | `icon_type`, `icon_color`, `inner_sun_color`, `outer_sun_color`, `raindrop_color`, `moon_color` | weather icons. `duotone` (default): line icons in `icon_color` (or the area's `forecast_icons_color`, else its text colour); the choice for one-colour icons, e.g. black on a coloured panel. `themed`: full-colour icons whose sun, moon and rain take shades of `icon_color` unless set one by one; clouds stay white/grey, so a dark `icon_color` gives a grey sun |
 | `poster_extension` | theme, area | `background_color`, `text_color` | colours of posters that follow the theme palette |
 | `glass_extension` | area only | `glass_blur` 0–40 (16), `glass_saturation` 100–200 (160), `glass_highlight_opacity` 0–100 (50), `glass_shadow_opacity` 0–100 (25) | frosted glass: blurs what is behind the area, adds a sheen, rim highlight and shadow. The tint and rim are the area's own `background_color`/`background_opacity` and border. Not in the web editor (API only); screens without backdrop blur show it unblurred |
 
