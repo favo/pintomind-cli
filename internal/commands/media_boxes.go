@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -140,9 +139,9 @@ func newMediaBoxesUpdateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			var mediaBox map[string]any
-			if err := json.Unmarshal([]byte(data), &mediaBox); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			mediaBox, err := parseJSONObjectFlag("data", data)
+			if err != nil {
+				return err
 			}
 			body := map[string]any{"media_box": mediaBox}
 			var resp map[string]any
@@ -153,7 +152,7 @@ func newMediaBoxesUpdateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&data, "data", "", "Media box fields as JSON (required)")
+	cmd.Flags().StringVar(&data, "data", "", "Media box fields as JSON, @file or - for stdin (required)")
 	_ = cmd.MarkFlagRequired("data")
 	return cmd
 }

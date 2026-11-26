@@ -776,9 +776,21 @@ pintomind themes list --page 2
 pintomind themes show <id>
 pintomind themes stats
 pintomind themes create --data '{"name":"Brand","font_family_header_id":1,"font_family_body_id":2,"background_color":"#1a1a2e","text_color":"#ffffff"}'
+pintomind themes create --data @theme.json      # every --data flag also takes @file or - (stdin)
 pintomind themes update <id> --data '{"color_palette_id":5}'
+pintomind themes areas <id>                      # theme areas, extensions (with ids) and the area mapping
+pintomind themes set-areas <id> --data '{"*:*:*":{"B":{"style":"accent"}},"*:portrait:*":{"A":{"style":"glass"}}}'
+pintomind themes set-effect <id> snow            # snow, rain, thunderstorm, leaves, hearts, sparkles or none
+pintomind themes preview-url <id>                # signed preview link, valid one hour
 pintomind themes delete <id>
 ```
+
+Theme areas and extensions are nested in `--data` as `theme_areas_attributes` and
+`theme_extensions_attributes`: leave out `id` to add one, pass an `id` from `themes areas` to change
+it, and add `"_destroy": true` to remove it. Extensions include `glass_extension` (frosted glass on a
+theme area, API only). `areas` (or `set-areas`) replaces the whole mapping of layout areas onto
+theme areas; keys may target one orientation (`*:portrait:*`). The skill's
+`references/themes.md` has the full field list.
 
 Background image and logo are media boxes. `set-background` and `set-logo` create the box and attach it in one step:
 
@@ -797,11 +809,14 @@ pintomind themes set-logo <id> --clear
 ```bash
 pintomind color-palettes list   # alias: pintomind palettes list
 pintomind color-palettes show <id>
-pintomind color-palettes create --data '{"name":"Brand","colors":["#FF0000","#00FF00"]}'
-pintomind color-palettes update <id> --data '{"name":"Brand v2"}'
+pintomind color-palettes create --name "Brand" --primary-color "#1F8A8A" --secondary-color "#F5A623"
+pintomind color-palettes update <id> --name "Brand v2"
+pintomind color-palettes update <id> --primary-color "#AA2222"   # regenerates that colour's weights
 pintomind color-palettes delete <id>
 pintomind color-palettes stats
 ```
+
+A palette update changes every theme using it, and their screens reload.
 
 ### Font Families
 
@@ -965,7 +980,10 @@ pintomind schemas show location
 
 ## AI Agent Skills
 
-The Pintomind skill is embedded in the binary.
+The Pintomind skill is embedded in the binary: a short `SKILL.md` that tells the agent which
+reference to read, and `references/` with the details per area (screens, channels, posts,
+resources, media, themes, theme design, admin). The agent loads a reference only when the task
+needs it.
 
 For Claude Code:
 
@@ -973,7 +991,7 @@ For Claude Code:
 pintomind setup claude
 ```
 
-This writes `~/.claude/skills/pintomind/SKILL.md`, making `/pintomind` available as a slash command in any Claude Code session. Re-running the command overwrites an existing installation.
+This writes the skill to `~/.claude/skills/pintomind/` (`SKILL.md` and `references/`), making `/pintomind` available as a slash command in any Claude Code session.
 
 For Codex and ChatGPT/OpenAI-compatible agents:
 
@@ -981,6 +999,8 @@ For Codex and ChatGPT/OpenAI-compatible agents:
 pintomind setup codex
 ```
 
-This writes `SKILL.md` and `agents/openai.yaml` to `$CODEX_HOME/skills/pintomind`, or `~/.codex/skills/pintomind` when `CODEX_HOME` is unset. The command also works as `pintomind setup openai` or `pintomind setup chatgpt`.
+This writes the same files plus `agents/openai.yaml` to `$CODEX_HOME/skills/pintomind`, or `~/.codex/skills/pintomind` when `CODEX_HOME` is unset. The command also works as `pintomind setup openai` or `pintomind setup chatgpt`.
+
+Re-running either command upgrades the installation, including an older single-file one: `SKILL.md` is overwritten and `references/` is replaced as a whole. Other files in the folder are left alone. Run it again after `pintomind update`.
 
 Once installed, agents can interact with your screens on your behalf — listing screens, sending commands, switching channels, uploading media, creating posts, and more.

@@ -35,6 +35,19 @@ func parseJSONFlag(flag, value string) (any, error) {
 	return out, nil
 }
 
+// parseJSONObjectFlag is parseJSONFlag for flags that must hold a JSON object.
+func parseJSONObjectFlag(flag, value string) (map[string]any, error) {
+	parsed, err := parseJSONFlag(flag, value)
+	if err != nil {
+		return nil, err
+	}
+	object, ok := parsed.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("--%s must be a JSON object", flag)
+	}
+	return object, nil
+}
+
 type ScheduleBlock struct {
 	Type          string  `json:"type"`
 	Wday          *int    `json:"wday"`

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pintomind"
+  short_description: "Control Pintomind screens, content, and media"
+  default_prompt: "Use $pintomind to manage Pintomind screens, channels, posts, media and themes from the CLI."

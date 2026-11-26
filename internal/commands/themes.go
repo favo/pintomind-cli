@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -32,6 +31,10 @@ func NewThemesCmd() *cobra.Command {
 	cmd.AddCommand(newThemesStatsCmd())
 	cmd.AddCommand(newThemesCreateCmd())
 	cmd.AddCommand(newThemesUpdateCmd())
+	cmd.AddCommand(newThemesAreasCmd())
+	cmd.AddCommand(newThemesSetAreasCmd())
+	cmd.AddCommand(newThemesSetEffectCmd())
+	cmd.AddCommand(newThemesPreviewURLCmd())
 	cmd.AddCommand(newThemesSetMediaBoxCmd("background"))
 	cmd.AddCommand(newThemesSetMediaBoxCmd("logo"))
 	cmd.AddCommand(newThemesDeleteCmd())
@@ -114,14 +117,15 @@ func newThemesCreateCmd() *cobra.Command {
 	var data string
 
 	cmd := &cobra.Command{
-		Use:     "create --data '<json>'",
-		Short:   "Create a theme",
-		Example: `  pintomind themes create --data '{"name":"My theme","font_family_header_id":1,"font_family_body_id":2,"background_color":"#1a1a2e","text_color":"#ffffff"}'`,
+		Use:   "create --data '<json>'",
+		Short: "Create a theme",
+		Example: `  pintomind themes create --data '{"name":"My theme","font_family_header_id":1,"font_family_body_id":2,"background_color":"#1a1a2e","text_color":"#ffffff"}'
+  pintomind themes create --data @theme.json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a := app(cmd)
-			var theme map[string]any
-			if err := json.Unmarshal([]byte(data), &theme); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			theme, err := parseJSONObjectFlag("data", data)
+			if err != nil {
+				return err
 			}
 			body := map[string]any{"theme": theme}
 			var resp map[string]any
@@ -132,7 +136,7 @@ func newThemesCreateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&data, "data", "", "Theme attributes as JSON (required)")
+	cmd.Flags().StringVar(&data, "data", "", "Theme attributes as JSON, @file or - for stdin (required)")
 	_ = cmd.MarkFlagRequired("data")
 	return cmd
 }
@@ -143,12 +147,17 @@ func newThemesUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update <id> --data '<json>'",
 		Short: "Update a theme",
-		Args:  cobra.ExactArgs(1),
+		Long: `Update a theme. Only the fields given change.
+
+Nested theme_areas_attributes and theme_extensions_attributes add an entry without "id",
+change the entry with that "id", and remove it with "id" plus "_destroy": true; themes areas
+<id> lists the ids. "areas" replaces the whole area mapping.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			var theme map[string]any
-			if err := json.Unmarshal([]byte(data), &theme); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			theme, err := parseJSONObjectFlag("data", data)
+			if err != nil {
+				return err
 			}
 			body := map[string]any{"theme": theme}
 			var resp map[string]any
@@ -159,7 +168,7 @@ func newThemesUpdateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&data, "data", "", "Theme attributes as JSON (required)")
+	cmd.Flags().StringVar(&data, "data", "", "Theme attributes as JSON, @file or - for stdin (required)")
 	_ = cmd.MarkFlagRequired("data")
 	return cmd
 }

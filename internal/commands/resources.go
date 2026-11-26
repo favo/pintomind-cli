@@ -180,9 +180,9 @@ Advanced: pass raw API JSON with --type and --data (skips validation helpers).`,
 				return fmt.Errorf("specify a resource type subcommand (e.g. `resources create text`) or pass --type with --data — see `resources create --help`")
 			}
 			a := app(cmd)
-			var resource map[string]any
-			if err := json.Unmarshal([]byte(data), &resource); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			resource, err := parseJSONObjectFlag("data", data)
+			if err != nil {
+				return err
 			}
 			body := map[string]any{
 				"type":     resourceType,
@@ -197,7 +197,7 @@ Advanced: pass raw API JSON with --type and --data (skips validation helpers).`,
 		},
 	}
 	cmd.Flags().StringVar(&resourceType, "type", "", "Advanced: resource type alias for raw JSON mode (use a subcommand instead)")
-	cmd.Flags().StringVar(&data, "data", "", "Advanced: raw resource fields as JSON (paired with --type)")
+	cmd.Flags().StringVar(&data, "data", "", "Advanced: raw resource fields as JSON, @file or - (paired with --type)")
 	return cmd
 }
 
@@ -210,9 +210,9 @@ func newResourcesUpdateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			var resource map[string]any
-			if err := json.Unmarshal([]byte(data), &resource); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			resource, err := parseJSONObjectFlag("data", data)
+			if err != nil {
+				return err
 			}
 			body := map[string]any{"resource": resource}
 			var resp map[string]any
@@ -223,7 +223,7 @@ func newResourcesUpdateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&data, "data", "", "Resource fields as JSON (required)")
+	cmd.Flags().StringVar(&data, "data", "", "Resource fields as JSON, @file or - for stdin (required)")
 	_ = cmd.MarkFlagRequired("data")
 	return cmd
 }

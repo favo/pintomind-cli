@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -198,9 +197,9 @@ Advanced: pass raw API JSON with --type and --data (skips validation helpers).`,
 			a := app(cmd)
 			body := map[string]any{"type": postType}
 			if data != "" {
-				var post map[string]any
-				if err := json.Unmarshal([]byte(data), &post); err != nil {
-					return fmt.Errorf("invalid JSON for --data: %w", err)
+				post, err := parseJSONObjectFlag("data", data)
+				if err != nil {
+					return err
 				}
 				body["post"] = post
 			}
@@ -216,7 +215,7 @@ Advanced: pass raw API JSON with --type and --data (skips validation helpers).`,
 		},
 	}
 	cmd.Flags().StringVar(&postType, "type", "", "Advanced: post type alias for raw JSON mode (use a subcommand instead)")
-	cmd.Flags().StringVar(&data, "data", "", "Advanced: raw post fields as JSON (paired with --type)")
+	cmd.Flags().StringVar(&data, "data", "", "Advanced: raw post fields as JSON, @file or - (paired with --type)")
 	cmd.Flags().StringVar(&sourceID, "source-id", "", "Duplicate a network poster template (poster type only)")
 	return cmd
 }
@@ -230,9 +229,9 @@ func newPostsUpdateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			var post map[string]any
-			if err := json.Unmarshal([]byte(data), &post); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			post, err := parseJSONObjectFlag("data", data)
+			if err != nil {
+				return err
 			}
 			body := map[string]any{"post": post}
 			var resp map[string]any
@@ -243,7 +242,7 @@ func newPostsUpdateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&data, "data", "", "Post fields as JSON (required)")
+	cmd.Flags().StringVar(&data, "data", "", "Post fields as JSON, @file or - for stdin (required)")
 	_ = cmd.MarkFlagRequired("data")
 	return cmd
 }
