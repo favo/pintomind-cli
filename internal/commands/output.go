@@ -32,6 +32,16 @@ func printJSON(v any) {
 // printTotal prints the "Total: N" header of a list command. It prefers
 // pagination.total_count (all matching records) over the page-sized total and
 // shows the current page when there is more than one.
+// printResponseJSON prints the API's own response body for --json, falling back to v
+func printResponseJSON(a *appctx.App, v any) {
+	var raw any
+	if err := json.Unmarshal(a.Client.LastBody, &raw); err != nil {
+		printJSON(v)
+		return
+	}
+	printJSON(raw)
+}
+
 func printTotal(total int, p *Pagination) {
 	fmt.Println(totalLine(total, p))
 	fmt.Println()

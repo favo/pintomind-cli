@@ -67,7 +67,7 @@ func newChannelsListCmd() *cobra.Command {
 			}
 
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 

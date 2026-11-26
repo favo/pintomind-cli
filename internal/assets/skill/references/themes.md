@@ -65,7 +65,8 @@ secondary, say) falls back to the same primary weight. Empty means "not set".
 A **theme area** is a named style: `name`, `identifier` (the key the mapping uses), background
 fields, `text_color` and the other text and signal colours, border fields (`border_color`,
 `border_style` `solid dashed dotted` (anything else is refused), `border_width` 0–10, `border_radius` or the four corner radii
-0–20) and its own `theme_extensions_attributes`.
+0–20) and its own `theme_extensions_attributes`. `border_radius` sets all four corners; set the four
+corner fields for uneven corners (the response then reports `border_radius` as the top-left value).
 
 A theme area shows only where **`areas`** maps it onto a layout area:
 
@@ -81,7 +82,10 @@ A theme area shows only where **`areas`** maps it onto a layout area:
   (every layout in one orientation), `<template>:*:*`, `<template>:<orientation>:*`,
   `<template>:<orientation>:<extension>`. Other key shapes are refused.
 - Layout areas: `A`, `B`, `C`, `D`, `CLOCK`, `TICKER`, `LOGO`; a channel's layout decides which it
-  has (`pintomind channels layouts`). `none` is the plain theme.
+  has: `pintomind channels layouts` lists the templates, and a template's name is its areas (`ABC` has A, B and C), plus CLOCK, TICKER and LOGO where the extension says so. `none` is the plain theme.
+  A is usually the main area; the preview link uses a landscape layout with A (left, large), B (top
+  right) and C (bottom right, with the clock post). Each post sits in one area, so a style is the
+  whole look of that area: an LCARS "elbow" or a poster border is a border on one area.
 - `areas` **replaces the whole mapping**; send every key you want to keep. A style that isn't one
   of the theme's identifiers is refused, and so is renaming or removing an area the mapping uses
   unless the same request sends a new `areas`.
@@ -188,7 +192,9 @@ pintomind color-palettes delete <id> --force
 
 Colours are hex (e.g. `#1F8A8A`). On create the API generates twelve weights (50 … 950) per base
 colour. On update, a base colour that changes regenerates its weights; one left out or sent
-unchanged keeps them. **Every theme using the palette changes with it**, and the screens showing
+unchanged keeps them. `color-palettes show <id>` (and the create/update result) lists the
+generated `weights`, e.g. `"primary-700": "#1B5E5E"`: read them before picking references, since the
+base colour lands on whichever weight matches its lightness. **Every theme using the palette changes with it**, and the screens showing
 those themes reload: check `color-palettes show <id>` (its `themes`) before changing a palette in
 use. Deleting a palette repoints themes using it to another available palette; returns an error if
 none exists. Palettes shared with network members cannot be deleted.
@@ -227,7 +233,15 @@ Font types:
 - `standard` — built-in fonts, read-only (cannot be created or deleted).
 
 `force_text_transform` makes the font always upper/lower/capitalised; a theme's own
-`text_transform_*` wins over it. `suitable_for_body` marks fonts readable at small sizes.
+`text_transform_*` wins over it. `suitable_for_body` marks fonts readable at small sizes; the CLI
+creates fonts without it unless you pass `--suitable-for-body`, so set it only for body fonts.
+
+The create and update result is `{"success": true, "font_family": {…}}` (so with `--json`, the id is
+`.font_family.id`; `show` and `list` give the font itself). It lists the `faces` the font loaded,
+e.g. `[{"weight": "400", "style": "normal"}, {"weight": "700", "style": "normal"}]` (a variable font
+gives a range like `"100 900"`), and a `warnings` entry when there is no bold: headings are bold, so
+the screen fakes it. Add the weights to a Google Fonts URL (`family=Name:wght@400;700`) and update the
+font with the new `--url`.
 Deleting a font resets themes using it to the system default (`figtree`).
 Fonts shared with network members cannot be deleted.
 

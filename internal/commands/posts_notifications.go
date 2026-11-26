@@ -66,7 +66,7 @@ func newPostsNotificationsListCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 

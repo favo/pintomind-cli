@@ -116,7 +116,7 @@ func newIntegrationsListCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 			rows := make([][]string, len(resp.Integrations))
@@ -148,7 +148,7 @@ func newIntegrationsTypesCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 			rows := make([][]string, len(resp.Types))
@@ -177,7 +177,7 @@ func newIntegrationsShowCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 			fmt.Printf("%d  %s (%s)\n", resp.ID, resp.Label, resp.Type)

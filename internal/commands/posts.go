@@ -119,7 +119,7 @@ func newPostsListCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 
@@ -289,7 +289,7 @@ func newPostsPublicationsCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 

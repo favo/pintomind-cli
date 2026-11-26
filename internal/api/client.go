@@ -38,6 +38,9 @@ type Client struct {
 	NetworkID  int
 	HTTPClient *http.Client
 	Verbose    bool
+	// LastBody is the raw body of the last successful response, so --json can print what the API
+	// sent rather than the fields a command's struct keeps
+	LastBody []byte
 }
 
 func New(baseURL, apiKey string) *Client {
@@ -149,6 +152,9 @@ func (c *Client) do(method, path string, body any, out any) error {
 }
 
 func (c *Client) decodeResponse(status int, data []byte, out any) error {
+	if status < 400 {
+		c.LastBody = data
+	}
 	if status >= 400 {
 		return c.withHint(ResponseError(status, data), status)
 	}

@@ -52,9 +52,11 @@ over. The commands are in `themes.md`.
   colour so the panels float. Older screens show it without blur, so the tint alone must still give
   enough contrast.
 - **Patterns and textures** are decoration: keep them low-contrast against the background colour.
-  Patterns: `bokha` (soft squares, not bokeh), `polygon`, `tiles`, `radial` (a glow). Most textures
-  darken (multiply), so they vanish on black and turn light backgrounds grey (`paper` on linen);
-  `noise-1` and `snow` don't.
+  Patterns: `bokha` (soft squares, not bokeh), `polygon`, `tiles`, `radial` (a glow). Textures
+  (`background_noise`): `noise-1`, `grunge`, `paper`, `pinstripe`, `mosaic`, `speckles`, `squares`,
+  `dots`, `wood`, `lines`, `shapes`, `mathematics`, `cubes`, `snow`, `dust`, `cotton`, `denim`. All
+  but `noise-1` and `snow` darken (multiply): they vanish on black and turn light backgrounds a shade
+  greyer (`paper` on linen), so on a light theme pick a light one and check the preview.
 - **Borders** are `solid`, `dashed` or `dotted`, 0–10 wide; anything else is refused. A border reads
   from across a room at 4px or more.
 - **Fonts.** The body font must stay readable at small sizes; display fonts are for headers only.
@@ -64,7 +66,8 @@ over. The commands are in `themes.md`.
   empty gap colour lets the background show through, which suits rounded or glass areas.
 - **Screen effects** (`themes set-effect`) draw over the whole screen, posts included. Keep them to
   themes with a calm layout, for a season or an occasion, and check that text stays readable while
-  particles pass over it.
+  particles pass over it. Snow is white: on a light theme it shows only over darker parts (the
+  background image, the gaps), not over white panels.
 - **Signal colours and extensions** are for the posts the channel actually shows (clock, calendar,
   weather, counters). Don't spend effort on ones nothing on the channel uses. An extension on a theme
   area overrides the theme's inside that area only. Colours set on a theme-level extension (a dark

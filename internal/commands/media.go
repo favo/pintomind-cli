@@ -106,7 +106,7 @@ func newMediaCollectionsListCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 
@@ -285,7 +285,7 @@ func newMediaListCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 

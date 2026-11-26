@@ -144,3 +144,54 @@ func TestThemesAreasAndPreviewURLRead(t *testing.T) {
 		}
 	}
 }
+
+func TestListJSONPrintsTheAPIResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"total": 1, "items": []any{map[string]any{"id": 6, "type": "standard", "name": "Monoton", "suitable_for_body": false}}})
+	}))
+	t.Cleanup(server.Close)
+	setupOAuthConnection(t, server.URL)
+
+	out := captureStdout(t, func() {
+		if err := run("--account-id", "3", "font-families", "list", "--json"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(out, `"suitable_for_body": false`) {
+		t.Fatalf("--json dropped fields the API sent:\n%s", out)
+	}
+}
+
+func TestFontCreateSendsSuitableForBodyFalseByDefault(t *testing.T) {
+	var body map[string]map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&body)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"success": true, "font_family": map[string]any{"id": 9}})
+	}))
+	t.Cleanup(server.Close)
+	setupOAuthConnection(t, server.URL)
+
+	if err := run("--account-id", "3", "font-families", "create", "remote-css", "--name", "Limelight", "--url", "https://fonts.googleapis.com/css2?family=Limelight"); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := body["font_family"]["suitable_for_body"]; !ok || got != false {
+		t.Fatalf("suitable_for_body = %v (sent: %v), want false", got, ok)
+	}
+}
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout := os.Stdout
+	os.Stdout = write
+	fn()
+	write.Close()
+	os.Stdout = stdout
+	out, _ := io.ReadAll(read)
+	return string(out)
+}

@@ -95,7 +95,7 @@ func newWebhooksDeliveriesCmd() *cobra.Command {
 			}
 
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 
@@ -143,7 +143,7 @@ func newWebhooksListCmd() *cobra.Command {
 			}
 
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 
@@ -188,7 +188,7 @@ func newWebhooksEventsCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 			rows := make([][]string, len(resp.Events))
