@@ -64,7 +64,7 @@ secondary, say) falls back to the same primary weight. Empty means "not set".
 
 A **theme area** is a named style: `name`, `identifier` (the key the mapping uses), background
 fields, `text_color` and the other text and signal colours, border fields (`border_color`,
-`border_style` `solid dashed dotted`, `border_width` 0–10, `border_radius` or the four corner radii
+`border_style` `solid dashed dotted` (anything else is refused), `border_width` 0–10, `border_radius` or the four corner radii
 0–20) and its own `theme_extensions_attributes`.
 
 A theme area shows only where **`areas`** maps it onto a layout area:
@@ -88,6 +88,9 @@ A theme area shows only where **`areas`** maps it onto a layout area:
 - A theme area left out of the mapping shows nowhere. `set-areas` sends just the mapping.
 
 ### Changing nested areas and extensions
+
+An extension on a theme area overrides the same extension on the theme inside that area only; values
+it leaves blank fall back to the theme's.
 
 `theme_areas_attributes` and `theme_extensions_attributes` are arrays. An entry without `id` is
 added, one with an `id` is changed, and `id` plus `"_destroy": true` removes it. Get the ids from
