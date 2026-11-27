@@ -16,8 +16,8 @@ func newScreensDeleteCmd() *cobra.Command {
 		Short: "Disconnect a screen from the account (it shows a new code and can be connected again)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !confirmAction(fmt.Sprintf("Disconnect screen %s from the account?", args[0]), force) {
-				return nil
+			if ok, err := confirmAction(fmt.Sprintf("Disconnect screen %s from the account?", args[0]), force); !ok {
+				return err
 			}
 			return runDelete(cmd, "/screens/"+args[0], "screen "+args[0])
 		},
@@ -128,8 +128,8 @@ func newScreensProvisioningCmd() *cobra.Command {
 		Short: "Revoke a provisioning token",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !confirmAction(fmt.Sprintf("Revoke provisioning token %s?", args[0]), force) {
-				return nil
+			if ok, err := confirmAction(fmt.Sprintf("Revoke provisioning token %s?", args[0]), force); !ok {
+				return err
 			}
 			if err := app(cmd).Client.Delete("/provisioning_tokens/" + args[0]); err != nil {
 				return err

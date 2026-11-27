@@ -195,3 +195,18 @@ func captureStdout(t *testing.T, fn func()) string {
 	out, _ := io.ReadAll(read)
 	return string(out)
 }
+
+func TestConfirmationsRefuseWithoutATerminal(t *testing.T) {
+	server, calls := newFakeThemesAPI(t)
+	setupOAuthConnection(t, server.URL)
+
+	for _, args := range [][]string{{"posts", "unpublish", "384", "--channel-id", "3"}, {"themes", "delete", "12"}, {"channels", "delete", "3"}} {
+		err := run(append([]string{"--account-id", "3"}, args...)...)
+		if err == nil || !strings.Contains(err.Error(), "--force") {
+			t.Fatalf("%v: err = %v, want it to ask for --force", args, err)
+		}
+	}
+	if len(*calls) != 0 {
+		t.Fatalf("an unconfirmed command reached the API: %v", *calls)
+	}
+}

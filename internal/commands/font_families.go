@@ -332,15 +332,8 @@ func newFontFamiliesDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Delete font family %s? Themes using it will be reset to the system default font (figtree). Pass --force to skip this prompt.\n", args[0])
-				var confirm string
-				fmt.Print("Type 'yes' to confirm: ")
-				fmt.Scanln(&confirm)
-				if confirm != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Delete font family %s? Themes using it will be reset to the system default font (figtree).", args[0]), force); !ok {
+				return err
 			}
 			if err := a.Client.Delete("/font_families/" + args[0]); err != nil {
 				return err

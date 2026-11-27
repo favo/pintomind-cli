@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -92,11 +91,11 @@ func newPostsScheduleGetCmd() *cobra.Command {
 
 func newPostsScheduleSetCmd() *cobra.Command {
 	var (
-		periods       []string
-		rules         []string
-		expiryAction  string
-		clearPeriods  bool
-		clearRules    bool
+		periods      []string
+		rules        []string
+		expiryAction string
+		clearPeriods bool
+		clearRules   bool
 	)
 	cmd := &cobra.Command{
 		Use:   "set <post-id>",
@@ -182,14 +181,8 @@ func newPostsScheduleClearCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Clear time schedule for post %s? Type 'yes' to confirm: ", args[0])
-				var confirm string
-				fmt.Scanln(&confirm)
-				if strings.TrimSpace(confirm) != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Clear time schedule for post %s?", args[0]), force); !ok {
+				return err
 			}
 			if err := a.Client.Delete("/posts/" + args[0] + "/time_schedule"); err != nil {
 				return err
@@ -201,4 +194,3 @@ func newPostsScheduleClearCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
 	return cmd
 }
-

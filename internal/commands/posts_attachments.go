@@ -271,14 +271,8 @@ func newPostsAttachmentsDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Delete attachment %s from post %s? Type 'yes' to confirm: ", args[1], args[0])
-				var confirm string
-				fmt.Scanln(&confirm)
-				if strings.TrimSpace(confirm) != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Delete attachment %s from post %s?", args[1], args[0]), force); !ok {
+				return err
 			}
 			if err := a.Client.Delete("/posts/" + args[0] + "/attachments/" + args[1]); err != nil {
 				return err

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -138,14 +137,8 @@ func newPostsNotificationsCancelCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Cancel notification %s for post %s? Type 'yes' to confirm: ", args[1], args[0])
-				var confirm string
-				fmt.Scanln(&confirm)
-				if strings.TrimSpace(confirm) != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Cancel notification %s for post %s?", args[1], args[0]), force); !ok {
+				return err
 			}
 			if err := a.Client.Delete("/posts/" + args[0] + "/notifications/" + args[1]); err != nil {
 				return err

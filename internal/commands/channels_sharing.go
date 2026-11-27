@@ -156,8 +156,8 @@ func newSharingStopCmd() *cobra.Command {
 		Short: "Stop sharing a channel in Go (codes and invites in use are deactivated)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !confirmAction(fmt.Sprintf("Stop sharing channel %s? Its Go users lose it.", args[0]), force) {
-				return nil
+			if ok, err := confirmAction(fmt.Sprintf("Stop sharing channel %s? Its Go users lose it.", args[0]), force); !ok {
+				return err
 			}
 			return sendJSON(cmd, "DELETE", sharingPath(args[0]), nil)
 		},
@@ -203,8 +203,8 @@ func newSharingCodesCmd() *cobra.Command {
 		Short: "Remove a share code (not the last one; stop sharing instead)",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !confirmAction(fmt.Sprintf("Remove share code %s from channel %s?", args[1], args[0]), force) {
-				return nil
+			if ok, err := confirmAction(fmt.Sprintf("Remove share code %s from channel %s?", args[1], args[0]), force); !ok {
+				return err
 			}
 			return sendJSON(cmd, "DELETE", sharingPath(args[0])+"/codes/"+args[1], nil)
 		},
@@ -309,8 +309,8 @@ func newSharingInvitesCmd() *cobra.Command {
 		Short: "Remove an invite (one in use is deactivated and its device loses the channel)",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !confirmAction(fmt.Sprintf("Remove invite %s from channel %s?", args[1], args[0]), force) {
-				return nil
+			if ok, err := confirmAction(fmt.Sprintf("Remove invite %s from channel %s?", args[1], args[0]), force); !ok {
+				return err
 			}
 			return sendJSON(cmd, "DELETE", sharingPath(args[0])+"/invites/"+args[1], nil)
 		},

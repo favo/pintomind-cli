@@ -312,15 +312,8 @@ func newWebhooksDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Delete webhook %s? Pass --force to skip this prompt.\n", args[0])
-				var confirm string
-				fmt.Print("Type 'yes' to confirm: ")
-				fmt.Scanln(&confirm)
-				if confirm != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Delete webhook %s?", args[0]), force); !ok {
+				return err
 			}
 			if err := a.Client.Delete("/webhooks/" + args[0]); err != nil {
 				return err

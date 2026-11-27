@@ -94,8 +94,8 @@ func newChannelsDeleteCmd() *cobra.Command {
 		Short: "Delete a channel (soft-delete takes it off screens and schedules; a second call hard-deletes)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !confirmAction(fmt.Sprintf("Delete channel %s? Its screens lose it and it leaves their schedules.", args[0]), force) {
-				return nil
+			if ok, err := confirmAction(fmt.Sprintf("Delete channel %s? Its screens lose it and it leaves their schedules.", args[0]), force); !ok {
+				return err
 			}
 			return runDelete(cmd, "/channels/"+args[0], "channel "+args[0])
 		},

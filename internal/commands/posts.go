@@ -256,15 +256,8 @@ func newPostsDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Delete post %s? This soft-deletes (run again to hard-delete). Pass --force to skip this prompt.\n", args[0])
-				var confirm string
-				fmt.Print("Type 'yes' to confirm: ")
-				fmt.Scanln(&confirm)
-				if confirm != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Delete post %s? This soft-deletes (run again to hard-delete).", args[0]), force); !ok {
+				return err
 			}
 			if err := a.Client.Delete("/posts/" + args[0]); err != nil {
 				return err
@@ -379,15 +372,8 @@ func newPostsUnpublishCmd() *cobra.Command {
 			if len(channelIDs) == 0 {
 				target = "ALL channels"
 			}
-			if !force {
-				fmt.Printf("Unpublish post %s from %s? Pass --force to skip this prompt.\n", args[0], target)
-				var confirm string
-				fmt.Print("Type 'yes' to confirm: ")
-				fmt.Scanln(&confirm)
-				if confirm != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Unpublish post %s from %s?", args[0], target), force); !ok {
+				return err
 			}
 			var body any
 			if len(channelIDs) > 0 {

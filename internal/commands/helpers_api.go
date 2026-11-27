@@ -3,24 +3,35 @@ package commands
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
+	"strings"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
-func confirmAction(question string, force bool) bool {
+var stdinIsTerminal = func() bool {
+	return isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
+}
+
+// confirmAction refuses instead of asking when stdin is no terminal, so a script or agent never hangs on the prompt.
+func confirmAction(question string, force bool) (bool, error) {
 	if force {
-		return true
+		return true, nil
+	}
+	if !stdinIsTerminal() {
+		return false, fmt.Errorf("%s Not confirmed: there is no terminal to ask on, so pass --force", question)
 	}
 	fmt.Printf("%s Pass --force to skip this prompt.\n", question)
 	var answer string
 	fmt.Print("Type 'yes' to confirm: ")
 	fmt.Scanln(&answer)
-	if answer != "yes" {
+	if strings.TrimSpace(answer) != "yes" {
 		fmt.Println("Aborted.")
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }
 
 // runDelete sends DELETE and reports the API's {success, message} answer.

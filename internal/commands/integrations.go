@@ -327,8 +327,8 @@ func newIntegrationsRemoveResourceCmd() *cobra.Command {
 posts, is not deleted: the error names the posts to remove it from first.`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !confirmAction(fmt.Sprintf("Delete resource %s of integration %s?", args[1], args[0]), force) {
-				return nil
+			if ok, err := confirmAction(fmt.Sprintf("Delete resource %s of integration %s?", args[1], args[0]), force); !ok {
+				return err
 			}
 			return runDelete(cmd, "/integrations/"+url.PathEscape(args[0])+"/resources/"+url.PathEscape(args[1]), "resource "+args[1])
 		},
@@ -354,8 +354,8 @@ them too; one with resources shared with the network is not deleted.`,
 			if withResources {
 				question = fmt.Sprintf("Delete integration %s and every resource made from it?", args[0])
 			}
-			if !confirmAction(question, force) {
-				return nil
+			if ok, err := confirmAction(question, force); !ok {
+				return err
 			}
 			path := "/integrations/" + url.PathEscape(args[0])
 			if withResources {

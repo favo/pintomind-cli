@@ -242,8 +242,8 @@ func newScheduleClearCmd() *cobra.Command {
 		Short: "Remove a screen's channel schedule (standard channel all day, no night mode or reboot)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !confirmAction(fmt.Sprintf("Remove the channel schedule of screen %s?", args[0]), force) {
-				return nil
+			if ok, err := confirmAction(fmt.Sprintf("Remove the channel schedule of screen %s?", args[0]), force); !ok {
+				return err
 			}
 			return sendJSON(cmd, "DELETE", schedulePath(args[0]), nil)
 		},
@@ -322,8 +322,8 @@ func newScheduleTemplatesCmd() *cobra.Command {
 		Short: "Delete a template (linked screens keep their schedules)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !confirmAction(fmt.Sprintf("Delete channel schedule template %s?", args[0]), force) {
-				return nil
+			if ok, err := confirmAction(fmt.Sprintf("Delete channel schedule template %s?", args[0]), force); !ok {
+				return err
 			}
 			return runDelete(cmd, "/channel_schedule_templates/"+args[0], "template "+args[0])
 		},

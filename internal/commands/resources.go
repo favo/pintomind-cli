@@ -281,15 +281,8 @@ func newResourcesDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Delete resource %s? This soft-deletes (run again to hard-delete). Pass --force to skip this prompt.\n", args[0])
-				var confirm string
-				fmt.Print("Type 'yes' to confirm: ")
-				fmt.Scanln(&confirm)
-				if confirm != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Delete resource %s? This soft-deletes (run again to hard-delete).", args[0]), force); !ok {
+				return err
 			}
 			var resp map[string]any
 			if err := a.Client.DeleteWithBody("/resources/"+args[0], nil, &resp); err != nil {
