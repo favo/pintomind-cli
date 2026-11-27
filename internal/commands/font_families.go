@@ -65,7 +65,7 @@ func newFontFamiliesListCmd() *cobra.Command {
 			}
 
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 
@@ -143,9 +143,8 @@ func newFontFamiliesCreateRemoteCSSCmd() *cobra.Command {
 			if fontName != "" {
 				fontFamily["font_name"] = fontName
 			}
-			if cmd.Flags().Changed("suitable-for-body") {
-				fontFamily["suitable_for_body"] = suitableForBody
-			}
+			// The API marks a new font readable as body text unless told otherwise; the flag's default is no
+			fontFamily["suitable_for_body"] = suitableForBody
 			if cmd.Flags().Changed("force-text-transform") {
 				if err := validateTextTransform(forceTextTransform); err != nil {
 					return err
@@ -163,7 +162,7 @@ func newFontFamiliesCreateRemoteCSSCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Font family name (required)")
 	cmd.Flags().StringVar(&fontURL, "url", "", "Hosted CSS URL, e.g. Google Fonts URL (required)")
 	cmd.Flags().StringVar(&fontName, "font-name", "", "CSS font-family name override (picked from CSS if omitted)")
-	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Mark font as suitable for body text")
+	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Readable at small sizes, offered for body text (default false; display fonts leave it off)")
 	addTextTransformFlag(cmd, &forceTextTransform)
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("url")
@@ -186,9 +185,7 @@ func newFontFamiliesCreateUploadedCmd() *cobra.Command {
 				"type":              "uploaded",
 				"font_family[name]": name,
 			}
-			if cmd.Flags().Changed("suitable-for-body") {
-				fields["font_family[suitable_for_body]"] = fmt.Sprintf("%v", suitableForBody)
-			}
+			fields["font_family[suitable_for_body]"] = fmt.Sprintf("%v", suitableForBody)
 			if cmd.Flags().Changed("force-text-transform") {
 				if err := validateTextTransform(forceTextTransform); err != nil {
 					return err
@@ -218,7 +215,7 @@ func newFontFamiliesCreateUploadedCmd() *cobra.Command {
 	cmd.Flags().StringVar(&fontBold, "font-bold", "", "Path to bold weight font file (required)")
 	cmd.Flags().StringVar(&fontItalic, "font-italic", "", "Path to italic font file (optional)")
 	cmd.Flags().StringVar(&fontBoldItalic, "font-bold-italic", "", "Path to bold-italic font file (optional)")
-	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Mark font as suitable for body text")
+	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Readable at small sizes, offered for body text (default false; display fonts leave it off)")
 	addTextTransformFlag(cmd, &forceTextTransform)
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("font-normal")
@@ -321,7 +318,7 @@ func newFontFamiliesUpdateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&fontBold, "font-bold", "", "Path to bold weight font file (uploaded only)")
 	cmd.Flags().StringVar(&fontItalic, "font-italic", "", "Path to italic font file (uploaded only)")
 	cmd.Flags().StringVar(&fontBoldItalic, "font-bold-italic", "", "Path to bold-italic font file (uploaded only)")
-	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Mark font as suitable for body text")
+	cmd.Flags().BoolVar(&suitableForBody, "suitable-for-body", false, "Readable at small sizes, offered for body text (default false; display fonts leave it off)")
 	addTextTransformFlag(cmd, &forceTextTransform)
 	return cmd
 }
@@ -335,15 +332,8 @@ func newFontFamiliesDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Delete font family %s? Themes using it will be reset to the system default font (figtree). Pass --force to skip this prompt.\n", args[0])
-				var confirm string
-				fmt.Print("Type 'yes' to confirm: ")
-				fmt.Scanln(&confirm)
-				if confirm != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Delete font family %s? Themes using it will be reset to the system default font (figtree).", args[0]), force); !ok {
+				return err
 			}
 			if err := a.Client.Delete("/font_families/" + args[0]); err != nil {
 				return err

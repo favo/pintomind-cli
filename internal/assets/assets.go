@@ -1,11 +1,14 @@
 // Package assets embeds static files that are distributed with the binary.
-// Keep SKILL.md usable across Claude Code and Codex/OpenAI skill installs.
 package assets
 
-import _ "embed"
+import (
+	"embed"
+	"io/fs"
+)
 
-//go:embed SKILL.md
-var PintomindSkill []byte
+//go:embed all:skill
+var skillFiles embed.FS
 
-//go:embed agents/openai.yaml
-var OpenAIMetadata []byte
+// Skill is the pintomind skill folder: SKILL.md, references/ and agents/openai.yaml.
+// Keep it usable across Claude Code and Codex/OpenAI skill installs.
+var Skill, _ = fs.Sub(skillFiles, "skill")

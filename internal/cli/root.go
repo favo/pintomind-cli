@@ -18,6 +18,7 @@ func NewRootCmd() *cobra.Command {
 	var connectionOverride string
 	var jsonOutput bool
 	var verbose bool
+	var accountOverride, networkOverride int
 
 	root := &cobra.Command{
 		Use:     "pintomind",
@@ -33,8 +34,11 @@ func NewRootCmd() *cobra.Command {
 				commands.CheckForUpdate(version)
 			}
 			// Skip API client setup for config/update/setup subcommands
-			if isConnectionCmd(cmd) || isUpdateCmd(cmd) || isSetupCmd(cmd) {
+			if isConnectionCmd(cmd) || isUpdateCmd(cmd) || isSetupCmd(cmd) || isAuthCmd(cmd) {
 				return nil
+			}
+			if accountOverride != 0 && networkOverride != 0 {
+				return fmt.Errorf("--account-id and --network-id are mutually exclusive")
 			}
 
 			cfg, err := config.Load()
@@ -44,24 +48,33 @@ func NewRootCmd() *cobra.Command {
 
 			// Environment variables override the stored config when no explicit
 			// --connection is given. Handy for CI and scripted/headless use.
-			var baseURL, apiKey, domainName string
+			var client *api.Client
+			var domainName string
 			if connectionOverride == "" && os.Getenv("PINTOMIND_API_KEY") != "" {
-				apiKey = os.Getenv("PINTOMIND_API_KEY")
-				baseURL = os.Getenv("PINTOMIND_API_URL")
+				baseURL := os.Getenv("PINTOMIND_API_URL")
 				if baseURL == "" {
 					baseURL = "https://app.infoskjermen.no"
 				}
 				domainName = "env"
+				client = api.New(baseURL, os.Getenv("PINTOMIND_API_KEY"))
+				client.Verbose = verbose
 			} else {
 				name, domain, err := cfg.ActiveDomain(connectionOverride)
 				if err != nil {
 					return err
 				}
-				baseURL, apiKey, domainName = domain.BaseURL, domain.APIKey, name
+				if accountOverride != 0 || networkOverride != 0 {
+					if !domain.IsOAuth() {
+						return fmt.Errorf("--account-id and --network-id need an OAuth connection (pintomind login); connection %q uses an API key", name)
+					}
+					domain.AccountID, domain.NetworkID = accountOverride, networkOverride
+				}
+				if domain.IsOAuth() && domain.AccountID == 0 && domain.NetworkID == 0 && cmd.Annotations[commands.NoAccountAnnotation] == "" {
+					return fmt.Errorf("connection %q acts for no account yet — run: pintomind connection use-account (or use-network)", name)
+				}
+				domainName = name
+				client = commands.NewClient(name, domain, verbose)
 			}
-
-			client := api.New(baseURL, apiKey)
-			client.Verbose = verbose
 			app := &appctx.App{
 				Config:           cfg,
 				Client:           client,
@@ -81,6 +94,8 @@ func NewRootCmd() *cobra.Command {
 	root.PersistentFlags().StringVar(&connectionOverride, "connection", "", "Override active connection")
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")
 	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show HTTP request and response details")
+	root.PersistentFlags().IntVar(&accountOverride, "account-id", 0, "Act for this account for one command (OAuth connections)")
+	root.PersistentFlags().IntVar(&networkOverride, "network-id", 0, "Act for this network for one command (OAuth connections)")
 
 	const (
 		groupAPI  = "api"
@@ -112,13 +127,21 @@ func NewRootCmd() *cobra.Command {
 	addAPI(commands.NewColorPalettesCmd())
 	addAPI(commands.NewFontFamiliesCmd())
 	addAPI(commands.NewIconsCmd())
+	addAPI(commands.NewEmojisCmd())
+	addAPI(commands.NewUnsplashCmd())
+	addAPI(commands.NewGiphyCmd())
+	addAPI(commands.NewIntegrationsCmd())
 	addAPI(commands.NewWebhooksCmd())
 	addAPI(commands.NewTasksCmd())
 	addAPI(commands.NewSchemasCmd())
 	addAPI(commands.NewMeCmd())
+	addAPI(commands.NewAccountsCmd())
+	addAPI(commands.NewNetworksCmd())
 	addAPI(commands.NewNetworkCmd())
 	addAPI(commands.NewAPICmd())
 
+	addTool(commands.NewLoginCmd())
+	addTool(commands.NewLogoutCmd())
 	addTool(commands.NewConnectionCmd())
 	addTool(commands.NewSetupCmd(root))
 	addTool(commands.NewUpdateCmd(version))
@@ -148,6 +171,10 @@ func isConnectionCmd(cmd *cobra.Command) bool {
 		c = c.Parent()
 	}
 	return false
+}
+
+func isAuthCmd(cmd *cobra.Command) bool {
+	return (cmd.Name() == "login" || cmd.Name() == "logout") && cmd.Parent() != nil && cmd.Parent().Parent() == nil
 }
 
 func isUpdateCmd(cmd *cobra.Command) bool {

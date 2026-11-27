@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -77,7 +76,7 @@ func newMediaBoxesListCmd() *cobra.Command {
 				return err
 			}
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 
@@ -140,9 +139,9 @@ func newMediaBoxesUpdateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			var mediaBox map[string]any
-			if err := json.Unmarshal([]byte(data), &mediaBox); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			mediaBox, err := parseJSONObjectFlag("data", data)
+			if err != nil {
+				return err
 			}
 			body := map[string]any{"media_box": mediaBox}
 			var resp map[string]any
@@ -153,7 +152,7 @@ func newMediaBoxesUpdateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&data, "data", "", "Media box fields as JSON (required)")
+	cmd.Flags().StringVar(&data, "data", "", "Media box fields as JSON, @file or - for stdin (required)")
 	_ = cmd.MarkFlagRequired("data")
 	return cmd
 }
@@ -167,15 +166,8 @@ func newMediaBoxesDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Delete media box %s? Pass --force to skip this prompt.\n", args[0])
-				var confirm string
-				fmt.Print("Type 'yes' to confirm: ")
-				fmt.Scanln(&confirm)
-				if confirm != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Delete media box %s?", args[0]), force); !ok {
+				return err
 			}
 			if err := a.Client.Delete("/media_boxes/" + args[0]); err != nil {
 				return err

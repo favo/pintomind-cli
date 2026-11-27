@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -101,4 +102,96 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return fn(req)
+}
+
+type rotatingToken struct {
+	current   string
+	refreshes int
+}
+
+func (r *rotatingToken) Token() (string, error) { return r.current, nil }
+
+func (r *rotatingToken) Refresh(stale string) (string, error) {
+	r.refreshes++
+	r.current = "fresh"
+	return r.current, nil
+}
+
+func TestClientRefreshesOnceOn401AndSendsAccountHeaders(t *testing.T) {
+	var seen []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Header.Get("Authorization")+"|"+r.Header.Get("Account-Id")+"|"+r.Header.Get("Network-Id"))
+		if r.Header.Get("Authorization") != "Bearer fresh" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	auth := &rotatingToken{current: "expired"}
+	client := NewWithAuth(server.URL, auth)
+	client.AccountID = 42
+	var out map[string]any
+	if err := client.Post("/posts", map[string]any{"a": 1}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if auth.refreshes != 1 || out["ok"] != true {
+		t.Fatalf("refreshes = %d, out = %v", auth.refreshes, out)
+	}
+	want := []string{"Bearer expired|42|", "Bearer fresh|42|"}
+	if strings.Join(seen, ",") != strings.Join(want, ",") {
+		t.Fatalf("requests = %v, want %v", seen, want)
+	}
+
+	seen = nil
+	client.AccountID, client.NetworkID = 0, 7
+	if err := client.Get("/me", nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if seen[0] != "Bearer fresh||7" {
+		t.Fatalf("network request = %q", seen[0])
+	}
+}
+
+func TestClientWithAPIKeyDoesNotRetry401(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"invalid key"}`))
+	}))
+	defer server.Close()
+
+	err := New(server.URL, "sk-x").Get("/me", nil, nil)
+	if err == nil || err.Error() != "API error 401: invalid key" || calls != 1 {
+		t.Fatalf("err = %v, calls = %d", err, calls)
+	}
+}
+
+func TestForbiddenHints(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body      string
+		networkID int
+		want      string
+	}{
+		"network on an account endpoint": {`{"error":"Access denied: This endpoint requires an account-bearer API key"}`, 14, "acts for network 14"},
+		"sso":                            {`{"error":"This account requires single sign-on (SSO): connect again"}`, 0, "pintomind login"},
+		"other":                          {`{"error":"forbidden"}`, 14, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			client := newTestClient(http.StatusForbidden, tc.body)
+			client.NetworkID = tc.networkID
+			err := client.Get("/posts", nil, nil)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if tc.want == "" && strings.Contains(err.Error(), "\n") {
+				t.Fatalf("unexpected hint: %q", err)
+			}
+			if tc.want != "" && !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err = %q, want hint %q", err, tc.want)
+			}
+		})
+	}
 }

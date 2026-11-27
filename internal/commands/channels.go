@@ -32,6 +32,14 @@ func NewChannelsCmd() *cobra.Command {
 	cmd.AddCommand(newChannelsPostsCmd())
 	cmd.AddCommand(newChannelsStatsCmd())
 	cmd.AddCommand(newChannelsSetThemeCmd())
+	cmd.AddCommand(newChannelsCreateCmd())
+	cmd.AddCommand(newChannelsUpdateCmd())
+	cmd.AddCommand(newChannelsDeleteCmd())
+	cmd.AddCommand(newChannelsMovePostCmd())
+	cmd.AddCommand(newChannelsPreviewCmd())
+	cmd.AddCommand(newChannelsSearchCmd())
+	cmd.AddCommand(newChannelsLayoutsCmd())
+	cmd.AddCommand(newChannelsSharingCmd())
 	return cmd
 }
 
@@ -59,7 +67,7 @@ func newChannelsListCmd() *cobra.Command {
 			}
 
 			if a.JSONOutput {
-				printJSON(resp)
+				printResponseJSON(a, resp)
 				return nil
 			}
 
@@ -127,7 +135,7 @@ func newChannelsPostsCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "posts <channel-id>",
-		Short: "List posts in a channel (account token required)",
+		Short: "List posts in a channel (needs an account, not a network)",
 		Example: `  pintomind channels posts 7
   pintomind channels posts 7 --visible                 # currently visible only
   pintomind channels posts 7 --hidden                  # currently hidden only

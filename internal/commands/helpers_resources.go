@@ -104,7 +104,7 @@ func newResourcesCreateFeedCmd() *cobra.Command {
 }
 
 func newResourcesCreateCalendarCmd() *cobra.Command {
-	var color string
+	var color, privateEvents string
 
 	cmd := newResourcesCreateURLCmd(
 		"calendar",
@@ -114,12 +114,16 @@ func newResourcesCreateCalendarCmd() *cobra.Command {
 			if color != "" {
 				data["color"] = color
 			}
+			if privateEvents != "" {
+				data["private_events"] = privateEvents
+			}
 		},
 		func(urlStr, title *string) error {
 			return interactiveResourceCalendar(urlStr, title, &color)
 		},
 	)
 	cmd.Flags().StringVar(&color, "color", "", "Event color override (hex, e.g. #FF5733)")
+	cmd.Flags().StringVar(&privateEvents, "private-events", "", "How private events show: hide (default), show, or busy (as Occupied, without details)")
 	return cmd
 }
 

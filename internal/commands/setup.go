@@ -2,8 +2,10 @@ package commands
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -91,7 +93,8 @@ func newSetupClaudeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "claude",
 		Short: "Install the pintomind skill for Claude Code",
-		Long: `Installs the pintomind skill file to ~/.claude/skills/pintomind/SKILL.md.
+		Long: `Installs the pintomind skill to ~/.claude/skills/pintomind: SKILL.md and the
+references/ it loads when needed. Re-running it upgrades an earlier install.
 
 Once installed, Claude Code can use the /pintomind slash command to interact
 with your screens on your behalf from any project.`,
@@ -114,8 +117,9 @@ func newSetupCodexCmd() *cobra.Command {
 		Long: `Installs the pintomind skill to $CODEX_HOME/skills/pintomind, or
 ~/.codex/skills/pintomind when CODEX_HOME is unset.
 
-The install includes SKILL.md plus agents/openai.yaml metadata for OpenAI
-skill UIs such as Codex and ChatGPT-compatible agents.`,
+The install includes SKILL.md, references/ and agents/openai.yaml metadata for
+OpenAI skill UIs such as Codex and ChatGPT-compatible agents. Re-running it
+upgrades an earlier install.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := installCodexSkill(); err != nil {
 				return err
@@ -134,9 +138,7 @@ func installClaudeSkill() error {
 	}
 
 	skillDir := filepath.Join(home, ".claude", "skills", "pintomind")
-	dest := filepath.Join(skillDir, "SKILL.md")
-
-	if err := writeSkillFile(dest, assets.PintomindSkill); err != nil {
+	if err := installSkill(skillDir, false); err != nil {
 		return fmt.Errorf("installing Claude skill: %w", err)
 	}
 
@@ -145,7 +147,7 @@ func installClaudeSkill() error {
 		_ = os.Remove(stale)
 	}
 
-	fmt.Printf("Installed Claude skill to %s\n", dest)
+	fmt.Printf("Installed Claude skill to %s\n", skillDir)
 	return nil
 }
 
@@ -156,18 +158,33 @@ func installCodexSkill() error {
 	}
 
 	skillDir := filepath.Join(root, "skills", "pintomind")
-	skillDest := filepath.Join(skillDir, "SKILL.md")
-	metadataDest := filepath.Join(skillDir, "agents", "openai.yaml")
-
-	if err := writeSkillFile(skillDest, assets.PintomindSkill); err != nil {
+	if err := installSkill(skillDir, true); err != nil {
 		return fmt.Errorf("installing Codex skill: %w", err)
-	}
-	if err := writeSkillFile(metadataDest, assets.OpenAIMetadata); err != nil {
-		return fmt.Errorf("installing OpenAI skill metadata: %w", err)
 	}
 
 	fmt.Printf("Installed Codex/OpenAI skill to %s\n", skillDir)
 	return nil
+}
+
+// installSkill writes the embedded skill folder to dir. references/ is ours alone, so it is
+// replaced as a whole and a reference dropped from the binary doesn't linger after an upgrade.
+func installSkill(dir string, withAgents bool) error {
+	if err := os.RemoveAll(filepath.Join(dir, "references")); err != nil {
+		return fmt.Errorf("removing old references: %w", err)
+	}
+	return fs.WalkDir(assets.Skill, ".", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		if !withAgents && strings.HasPrefix(path, "agents/") {
+			return nil
+		}
+		content, err := fs.ReadFile(assets.Skill, path)
+		if err != nil {
+			return err
+		}
+		return writeSkillFile(filepath.Join(dir, filepath.FromSlash(path)), content)
+	})
 }
 
 func codexHome() (string, error) {

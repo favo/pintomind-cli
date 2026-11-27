@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
+
 	"github.com/spf13/cobra"
 )
 
@@ -47,12 +49,14 @@ func NewResourcesCmd() *cobra.Command {
 	}))
 	cmd.AddCommand(newResourcesRefreshCmd())
 	cmd.AddCommand(newResourcesDeleteCmd())
+	cmd.AddCommand(newResourcesTeamsCmd())
 	return cmd
 }
 
 func newResourcesListCmd() *cobra.Command {
 	var resourceType string
 	var sortBy string
+	var includeShared bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -66,6 +70,9 @@ func newResourcesListCmd() *cobra.Command {
 			if sortBy != "" {
 				q.Set("sort_by", sortBy)
 			}
+			if includeShared {
+				q.Set("include_shared", "true")
+			}
 			applyPagination(cmd, q)
 			var resp map[string]any
 			if err := a.Client.Get("/resources", q, &resp); err != nil {
@@ -77,8 +84,39 @@ func newResourcesListCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&resourceType, "type", "", "Filter by resource type alias (comma-separated for multiple)")
 	cmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort field: title, type, created_at, updated_at (e.g. title, updated_at:desc)")
+	cmd.Flags().BoolVar(&includeShared, "include-shared", false, "Also list what the account's networks share with it (shared: true), e.g. leagues")
 	addPaginationFlags(cmd, 200)
 	return cmd
+}
+
+func newResourcesTeamsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "teams <league-resource-id>",
+		Short: "List the teams in a sportmonks league (for a scores_and_fixtures post's follow_team_id)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a := app(cmd)
+			if a.JSONOutput {
+				return getJSON(cmd, "/resources/"+args[0]+"/teams", nil)
+			}
+			var resp struct {
+				Items []struct {
+					ID        int     `json:"id"`
+					Name      string  `json:"name"`
+					ShortCode *string `json:"short_code"`
+				} `json:"items"`
+			}
+			if err := a.Client.Get("/resources/"+args[0]+"/teams", nil, &resp); err != nil {
+				return err
+			}
+			rows := make([][]string, len(resp.Items))
+			for i, t := range resp.Items {
+				rows[i] = []string{strconv.Itoa(t.ID), t.Name, deref(t.ShortCode)}
+			}
+			printTable(cmd, []string{"ID", "NAME", "SHORT"}, rows)
+			return nil
+		},
+	}
 }
 
 func newResourcesShowCmd() *cobra.Command {
@@ -142,9 +180,9 @@ Advanced: pass raw API JSON with --type and --data (skips validation helpers).`,
 				return fmt.Errorf("specify a resource type subcommand (e.g. `resources create text`) or pass --type with --data — see `resources create --help`")
 			}
 			a := app(cmd)
-			var resource map[string]any
-			if err := json.Unmarshal([]byte(data), &resource); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			resource, err := parseJSONObjectFlag("data", data)
+			if err != nil {
+				return err
 			}
 			body := map[string]any{
 				"type":     resourceType,
@@ -159,7 +197,7 @@ Advanced: pass raw API JSON with --type and --data (skips validation helpers).`,
 		},
 	}
 	cmd.Flags().StringVar(&resourceType, "type", "", "Advanced: resource type alias for raw JSON mode (use a subcommand instead)")
-	cmd.Flags().StringVar(&data, "data", "", "Advanced: raw resource fields as JSON (paired with --type)")
+	cmd.Flags().StringVar(&data, "data", "", "Advanced: raw resource fields as JSON, @file or - (paired with --type)")
 	return cmd
 }
 
@@ -172,9 +210,9 @@ func newResourcesUpdateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			var resource map[string]any
-			if err := json.Unmarshal([]byte(data), &resource); err != nil {
-				return fmt.Errorf("invalid JSON for --data: %w", err)
+			resource, err := parseJSONObjectFlag("data", data)
+			if err != nil {
+				return err
 			}
 			body := map[string]any{"resource": resource}
 			var resp map[string]any
@@ -185,7 +223,7 @@ func newResourcesUpdateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&data, "data", "", "Resource fields as JSON (required)")
+	cmd.Flags().StringVar(&data, "data", "", "Resource fields as JSON, @file or - for stdin (required)")
 	_ = cmd.MarkFlagRequired("data")
 	return cmd
 }
@@ -243,15 +281,8 @@ func newResourcesDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a := app(cmd)
-			if !force {
-				fmt.Printf("Delete resource %s? This soft-deletes (run again to hard-delete). Pass --force to skip this prompt.\n", args[0])
-				var confirm string
-				fmt.Print("Type 'yes' to confirm: ")
-				fmt.Scanln(&confirm)
-				if confirm != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
+			if ok, err := confirmAction(fmt.Sprintf("Delete resource %s? This soft-deletes (run again to hard-delete).", args[0]), force); !ok {
+				return err
 			}
 			var resp map[string]any
 			if err := a.Client.DeleteWithBody("/resources/"+args[0], nil, &resp); err != nil {

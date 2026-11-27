@@ -38,7 +38,7 @@ pintomind update            # self-update to the latest release
 
 ## First-time setup
 
-The fastest way to get started is the guided wizard — it walks you through adding a connection, verifies your API key, and (optionally) installs the AI skills and shell completion:
+The fastest way to get started is the guided wizard — it logs you in with your user in the browser (or takes an API key), verifies the connection, and (optionally) installs the AI skills and shell completion:
 
 ```bash
 pintomind setup init
@@ -59,11 +59,51 @@ If you'd rather add the connection by hand, see [Connections](#connections) belo
 
 ## Connections
 
-Config is stored in `~/.config/pintomind/config.json`. You can add multiple connections with separate API keys — useful for keeping production and development environments apart.
+Config is stored in `~/.config/pintomind/config.json` (`$PINTOMIND_CONFIG_DIR` overrides the directory). You can have several connections — useful for keeping production and development apart. A connection either logs in with your own user (OAuth) or uses an API key.
 
 > Tip: `pintomind setup init` is the easiest way to add your first connection. The commands below are for managing connections after that.
 
-### Add a connection
+### Log in with your user (OAuth)
+
+```bash
+pintomind login                                        # https://app.infoskjermen.no
+pintomind login --url https://app.pintomind.com
+pintomind login --name develop --url https://develop.infoskjermen.no
+pintomind login --network 7                            # act for network 7 without asking
+pintomind login --no-browser                           # print the login URL instead of opening it
+```
+
+`login` opens the browser on the server's login page (SSO included). After logging in, the browser asks you to confirm that the Pintomind CLI may log in to your user; choose **Logg inn** to go on or **Avbryt** to cancel, which saves nothing. The browser then sends you back to the CLI on `http://127.0.0.1:<random port>/callback` (authorization code flow with PKCE). The connection is named after the host unless you pass `--name`; logging in again with the same name renews the login.
+
+- **Tokens** are kept in the OS keychain (macOS Keychain, Secret Service on Linux, Windows Credential Manager). Without one they go in `config.json`, readable only by you (mode 0600). `connection show` says which.
+- **Refreshing** is automatic: an expired access token, or a 401 from the API, refreshes the login. Parallel `pintomind` processes share one refresh lock, so a rotated refresh token is never sent twice (which would revoke the login). A login lasts as long as it is used; after 90 days without use, or when it is revoked elsewhere, run `pintomind login` again.
+- **Client ID:** the CLI knows its OAuth client per host. For other hosts pass `--client-id <id>`.
+- `login` needs a browser on the same machine. Over SSH, in CI or in scripts, use an API key.
+
+```bash
+pintomind logout                     # revoke the login on the server and remove the tokens
+pintomind logout --connection develop
+```
+
+`logout` keeps the connection's settings, so `pintomind login --name <connection>` logs in again. `connection remove` on an OAuth connection logs out first.
+
+### Accounts and networks
+
+A login belongs to your user, not to one account. Each OAuth connection acts for **one account** (requests carry `Account-Id`) **or one network** (`Network-Id`). `login` asks which after logging in (or picks your only account); switch later without logging in again:
+
+```bash
+pintomind accounts                         # accounts your login may act for
+pintomind networks                         # networks your login may act for
+pintomind connection use-account 123       # act for an account
+pintomind connection use-network 7         # act for a network
+pintomind connection use-account           # no ID: pick from a list
+pintomind --network-id 7 screens list      # another account or network for one command
+pintomind --account-id 123 posts list
+```
+
+Acting for a network reaches what a network API key reaches: the screens of member accounts that let the network manage them (every account for some network roles) and the network's network-wide webhooks. Your role in the network's account decides: reading needs a role that may view the network, changes need one that may manage it (`CAN WRITE` in `networks`). Endpoints that need an account, such as posts and media, refuse a network connection. If an account requires SSO, `accounts` or `networks` says so; log in again through that SSO.
+
+### Add a connection with an API key
 
 ```bash
 pintomind connection add main sk-your-key
@@ -122,7 +162,9 @@ pintomind me        # Connection: env
 
 `PINTOMIND_API_URL` is optional and defaults to `https://app.infoskjermen.no`;
 set it to target another endpoint. An explicit `--connection` flag always takes
-precedence over the env vars.
+precedence over the env vars. The env vars take only an API key: an OAuth login
+needs the stored connection, so pass `--connection` (or unset `PINTOMIND_API_KEY`)
+to use one.
 
 ---
 
@@ -131,6 +173,8 @@ precedence over the env vars.
 | Flag | Description |
 |------|-------------|
 | `--connection <name>` | Override active connection for this command |
+| `--account-id <id>` | Act for this account for one command (OAuth connections) |
+| `--network-id <id>` | Act for this network for one command (OAuth connections) |
 | `--json` | Output raw JSON (useful for scripting and piping to `jq`) |
 | `--verbose` / `-v` | Print HTTP request URL and response status to stderr |
 
@@ -162,8 +206,12 @@ Uploads the file, waits for processing, creates the post, and publishes it. Use 
 ### Identity
 
 ```bash
-pintomind me           # Show token, user, and account info
-pintomind network      # Show network identity and stats (requires network token)
+pintomind me           # Show user, account or network, and the OAuth client or API key
+pintomind me --scopes  # ...with the scopes
+pintomind accounts     # OAuth: accounts the login may act for
+pintomind networks     # OAuth: networks the login may act for
+pintomind network      # Network identity and member/screen stats
+pintomind network 14   # OAuth: a given network (default: the one the connection acts for, or your only one)
 ```
 
 ### Screens
@@ -223,7 +271,44 @@ pintomind screens backwards     [id|--ids ...|--all]
 pintomind screens confetti-fire      [id|--ids ...|--all]
 pintomind screens confetti-fireworks [id|--ids ...|--all]
 pintomind screens school-parade      [id|--ids ...|--all]
-pintomind screens snow               [id|--ids ...|--all]
+pintomind screens snow               [id|--ids ...|--all]   # also: rain, thunderstorm, leaves, hearts, sparkles
+pintomind screens snow 42 --duration 60 --intensity high    # seconds (0 = until stopped); low|medium|high
+pintomind screens stop-effects       [id|--ids ...|--all]
+```
+
+Weather-like effects replace each other; confetti stacks on top. `confetti-fire` is a single burst (no `--duration`).
+
+**Disconnect a screen:**
+
+```bash
+pintomind screens delete <id>    # the screen shows a new code and can be connected again
+```
+
+**Channel schedule** (day or week plan with channels, night mode and reboot; times in the standard channel's time zone):
+
+```bash
+pintomind screens schedule show 42
+pintomind screens schedule set 42 --mode daily \
+  --day-plan '[{"type":"channel","channel_id":12,"from_time":"08:00","to_time":"16:00"},{"type":"night","from_time":"22:00","to_time":"06:00"},{"type":"reboot","hour":4}]'
+pintomind screens schedule set 42 --mode weekly --week-plan @week.json   # blocks carry "wday": 0 (Sun) … 6 (Sat)
+pintomind screens schedule set 42 --template-id 3                        # apply and link a template
+pintomind screens schedule clear 42
+
+pintomind screens schedule templates list
+pintomind screens schedule templates create --name Office --mode daily --day-plan @day.json
+pintomind screens schedule templates update 3 --day-plan @day.json        # linked screens follow
+pintomind screens schedule templates delete 3
+```
+
+Plans are given inline, as `@file.json`, or `-` for stdin, and replace the whole plan; gaps show the standard channel.
+
+**Provisioning tokens** (a player redeems one on first contact to become a screen):
+
+```bash
+pintomind screens provisioning create --screen-id 42                 # the secret is shown only now
+pintomind screens provisioning create --new-screen --name Lobby --channel-id 7 --expires-in 86400
+pintomind screens provisioning list
+pintomind screens provisioning revoke <token-id>
 ```
 
 **Switch channel:**
@@ -246,7 +331,7 @@ pintomind screens temp-channel <screen-id> <channel-id> --toggle
 **Debug a screen:**
 
 Runs remote console commands on a screen. Needs an API key with the `screens:debug` scope (not ticked by default
-on new keys) and a screen that is online with butler 0.17.0 or newer; reload the screen to update it. Elements can be
+on new keys; an OAuth login never gets it) and a screen that is online with butler 0.17.0 or newer; reload the screen to update it. Elements can be
 given as a CSS selector or as a path such as `@1/1/2`, which `dom` and `elements` print. Every command supports `--json`.
 
 ```bash
@@ -286,6 +371,33 @@ pintomind channels stats                 # Requires channels:read:stats scope
 pintomind channels stats <id>
 pintomind channels set-theme <channel-id> <theme-id>
 pintomind channels set-theme --all <theme-id>   # Apply to all channels
+
+pintomind channels create --name Lobby                      # screen channel (template AB)
+pintomind channels create --name Lobby --template ABC --orientation portrait --extension ticker
+pintomind channels create --name "Our app" --type go
+pintomind channels update <id> --name "New name" --theme-id 3
+pintomind channels update <id> --template AB --orientation landscape        # screen channels
+pintomind channels update <id> --board-label News --board-icon-color "#FFFFFF"   # Go channel header
+pintomind channels delete <id>                              # soft-delete; run again to hard-delete
+pintomind channels layouts --favorites                      # valid template / orientation / extension
+pintomind channels move-post <channel-id> <post-id> --area B --position 0   # F11 = full screen
+pintomind channels preview <id>                             # signed link valid for an hour, no login
+pintomind channels search kirke                             # public Go channels (channels:search)
+pintomind channels search --lat 60.39 --lng 5.32            # nearest first
+```
+
+**Share a channel in the Go app:**
+
+```bash
+pintomind channels sharing show <id>
+pintomind channels sharing start <id> --code menighet       # everyone with the code (made up without --code)
+pintomind channels sharing start <id> --invites --web       # only invited email addresses; also on the web
+pintomind channels sharing update <id> --web=false
+pintomind channels sharing stop <id>
+pintomind channels sharing codes add|update|remove ...      # at most four codes
+pintomind channels sharing invites list <id>
+pintomind channels sharing invites add <id> kari@example.com ola@example.com
+pintomind channels sharing invites rename|resend|remove ...
 ```
 
 ### Posts
@@ -300,7 +412,14 @@ pintomind posts show <id>
 pintomind posts update <id> --data '{"name":"Updated name"}'
 pintomind posts delete <id>
 pintomind posts delete <id> --force
+pintomind posts archive <id>               # unpublishes it from every channel
+pintomind posts restore <id>               # archived or soft-deleted; not republished
+pintomind posts preview <id> --data '{"title":"Draft"}' --channel-id 7   # preview unsaved changes
+pintomind posts preview --type plain --data '{"heading":"<p>Hi</p>"}'    # preview a new post
+pintomind posts plain-layouts              # valid `variation` values for plain posts
 ```
+
+Video posts take `video_media_id` for one video or `video_media_ids` for several (`--data`).
 
 **Create posts with typed subcommands:**
 
@@ -452,7 +571,9 @@ pintomind resources list
 pintomind resources list --type feed
 pintomind resources list --type feed,calendar   # comma-separated types
 pintomind resources list --page 2 --per-page 50
+pintomind resources list --include-shared        # also what the account's networks share with it
 pintomind resources show <id>
+pintomind resources teams <league-id>            # teams for scores_and_fixtures follow_team_id
 pintomind resources stats
 pintomind resources refresh <id>         # For external resources only
 ```
@@ -655,9 +776,21 @@ pintomind themes list --page 2
 pintomind themes show <id>
 pintomind themes stats
 pintomind themes create --data '{"name":"Brand","font_family_header_id":1,"font_family_body_id":2,"background_color":"#1a1a2e","text_color":"#ffffff"}'
+pintomind themes create --data @theme.json      # every --data flag also takes @file or - (stdin)
 pintomind themes update <id> --data '{"color_palette_id":5}'
+pintomind themes areas <id>                      # theme areas, extensions (with ids) and the area mapping
+pintomind themes set-areas <id> --data '{"*:*:*":{"B":{"style":"accent"}},"*:portrait:*":{"A":{"style":"glass"}}}'
+pintomind themes set-effect <id> snow            # snow, rain, thunderstorm, leaves, hearts, sparkles or none
+pintomind themes preview-url <id>                # signed preview link, valid one hour
 pintomind themes delete <id>
 ```
+
+Theme areas and extensions are nested in `--data` as `theme_areas_attributes` and
+`theme_extensions_attributes`: leave out `id` to add one, pass an `id` from `themes areas` to change
+it, and add `"_destroy": true` to remove it. Extensions include `glass_extension` (frosted glass on a
+theme area, API only). `areas` (or `set-areas`) replaces the whole mapping of layout areas onto
+theme areas; keys may target one orientation (`*:portrait:*`). The skill's
+`references/themes.md` has the full field list.
 
 Background image and logo are media boxes. `set-background` and `set-logo` create the box and attach it in one step:
 
@@ -676,11 +809,14 @@ pintomind themes set-logo <id> --clear
 ```bash
 pintomind color-palettes list   # alias: pintomind palettes list
 pintomind color-palettes show <id>
-pintomind color-palettes create --data '{"name":"Brand","colors":["#FF0000","#00FF00"]}'
-pintomind color-palettes update <id> --data '{"name":"Brand v2"}'
+pintomind color-palettes create --name "Brand" --primary-color "#1F8A8A" --secondary-color "#F5A623"
+pintomind color-palettes update <id> --name "Brand v2"
+pintomind color-palettes update <id> --primary-color "#AA2222"   # regenerates that colour's weights
 pintomind color-palettes delete <id>
 pintomind color-palettes stats
 ```
+
+A palette update changes every theme using it, and their screens reload.
 
 ### Font Families
 
@@ -702,6 +838,53 @@ pintomind font-families create remote-css --name "Bebas" --url "https://fonts.go
 pintomind font-families update <id> --name "Renamed"
 pintomind font-families update <id> --force-text-transform none
 pintomind font-families delete <id>
+```
+
+### Icons, emojis, Unsplash and Giphy
+
+Look up values for media boxes:
+
+```bash
+pintomind icons                       # icon names, types and categories
+pintomind icons arrow --category ui
+pintomind emojis heart                # media_box.emoji
+pintomind unsplash forest --page 2    # media_box.photo_id (credit the photographer)
+pintomind giphy party --offset 25     # media_box.gif_id ("Powered by GIPHY")
+```
+
+### Integrations
+
+Integrations (calendars, social media, Microsoft 365 …) and the resources made from them. Connecting a new one goes through the provider's login in the web app or the Go app.
+
+```bash
+pintomind integrations list
+pintomind integrations types                    # what the account may connect
+pintomind integrations show <id>                # with the resources made from it
+pintomind integrations available <id>           # what the provider offers, numbered
+pintomind integrations available <id> --group-id <workspace>   # Power BI: one workspace at a time
+pintomind integrations add-resource <id> 3      # make a resource from offer number 3
+pintomind integrations remove-resource <id> <resource-id>
+pintomind integrations delete <id> [--with-resources]
+```
+
+A resource used in posts or shared with the network is not deleted; the error says why. An integration with resources is only deleted with `--with-resources`, which deletes them too.
+
+### Webhooks
+
+```bash
+pintomind webhooks events
+pintomind webhooks list
+pintomind webhooks create --event screen.offline --url https://example.com/hook [--screen-id 42]
+pintomind webhooks update <id> --enabled=false
+pintomind webhooks test <id>
+pintomind webhooks deliveries <id>
+pintomind webhooks delete <id>
+```
+
+The secret is shown only in the create response. **Network-wide webhooks:** with a connection acting for a network (`connection use-network`, or `--network-id`), webhooks are the network's own. A `screen.online`, `screen.offline`, `screen.paired` or `screen.unpaired` webhook created that way fires for every screen the network may manage, including member accounts that join later. Deliveries are batched: events are collected for 30 seconds and sent together with a `screens` list instead of `screen` (at most 500 per delivery), each entry with the screen's `account_id` and its own `occurred_at`. A test delivery uses the same shape.
+
+```bash
+pintomind --network-id 7 webhooks create --event screen.offline --url https://example.com/hook
 ```
 
 ### Raw API access
@@ -797,7 +980,10 @@ pintomind schemas show location
 
 ## AI Agent Skills
 
-The Pintomind skill is embedded in the binary.
+The Pintomind skill is embedded in the binary: a short `SKILL.md` that tells the agent which
+reference to read, and `references/` with the details per area (screens, channels, posts,
+resources, media, themes, theme design, admin). The agent loads a reference only when the task
+needs it.
 
 For Claude Code:
 
@@ -805,7 +991,7 @@ For Claude Code:
 pintomind setup claude
 ```
 
-This writes `~/.claude/skills/pintomind/SKILL.md`, making `/pintomind` available as a slash command in any Claude Code session. Re-running the command overwrites an existing installation.
+This writes the skill to `~/.claude/skills/pintomind/` (`SKILL.md` and `references/`), making `/pintomind` available as a slash command in any Claude Code session.
 
 For Codex and ChatGPT/OpenAI-compatible agents:
 
@@ -813,6 +999,8 @@ For Codex and ChatGPT/OpenAI-compatible agents:
 pintomind setup codex
 ```
 
-This writes `SKILL.md` and `agents/openai.yaml` to `$CODEX_HOME/skills/pintomind`, or `~/.codex/skills/pintomind` when `CODEX_HOME` is unset. The command also works as `pintomind setup openai` or `pintomind setup chatgpt`.
+This writes the same files plus `agents/openai.yaml` to `$CODEX_HOME/skills/pintomind`, or `~/.codex/skills/pintomind` when `CODEX_HOME` is unset. The command also works as `pintomind setup openai` or `pintomind setup chatgpt`.
+
+Re-running either command upgrades the installation, including an older single-file one: `SKILL.md` is overwritten and `references/` is replaced as a whole. Other files in the folder are left alone. Run it again after `pintomind update`.
 
 Once installed, agents can interact with your screens on your behalf — listing screens, sending commands, switching channels, uploading media, creating posts, and more.
